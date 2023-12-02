@@ -5,6 +5,8 @@ import { BoundingBoxTool } from './BoundingBoxTool'
 import "./index.css"
 
 //<spherical-video-renderer/>
+document.body.insertAdjacentHTML('afterbegin',``);
+
 
 let BBTool; let PanoElm; let LensFOV = 20; let offscreen; let offscreenanim;
 
@@ -39,20 +41,25 @@ const setupPano = (source, resX, resY, fov) => {
     div2.appendChild(PanoElm);
 }
 
+let newPano = true;
 const Media = new MediaElementCreator(div, {
-    ontargetchanged:(srcOrId, elm) => {
+    ontargetchanged:() => {
+        newPano = true;
+    },
+    onstarted:(srcOrId, elm) => {
 
         
-        if(elm) {
-        
+        if(elm && newPano) {
+            newPano = false;
             elm.style.width = "50%";
+            elm.style.maxHeight = "300px";
             
             let onframe = () => {
                 if(offscreen && PanoElm) PanoElm.onVideoFrame(); //this will run internally if a video element, and not if a canvas (rn)
                 if('requestVideoFrameCallback' in elm) elm.requestVideoFrameCallback(onframe);
             }
             onframe();
-            
+            console.log(elm.videoWidth, elm.videoHeight)
             setupPano(elm, elm.videoWidth, elm.videoHeight, LensFOV);
 
             BBTool?.clearBoundingBoxes(true);

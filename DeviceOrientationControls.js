@@ -6,7 +6,7 @@ import * as THREE from 'three'
  * W3C Device Orientation control (http://w3c.github.io/deviceorientation/spec-source-orientation.html)
  */
 
-export const DeviceOrientationControls = function( object ) {
+export const DeviceOrientationControls = function( object, offsetDeg ) {
 
 	var scope = this;
 
@@ -19,9 +19,9 @@ export const DeviceOrientationControls = function( object ) {
 	this.screenOrientation = 0;
 
 	this.alpha = 0;
-	this.alphaOffsetAngle = 0;
-	this.betaOffsetAngle = 0;
-	this.gammaOffsetAngle = 0;
+	this.alphaOffsetAngle = offsetDeg?.alpha || 0;
+	this.betaOffsetAngle = offsetDeg?.beta || 0;
+	this.gammaOffsetAngle = offsetDeg?.gamma || 0;
 
 
 	var onDeviceOrientationChangeEvent = function( event ) {
@@ -30,11 +30,11 @@ export const DeviceOrientationControls = function( object ) {
 
 	};
 
-	var onScreenOrientationChangeEvent = function() {
+	// var onScreenOrientationChangeEvent = function() {
 
-		scope.screenOrientation = window.orientation || 0;
+	// 	scope.screenOrientation = 0;
 
-	};
+	// };
 
 	// The angles alpha, beta and gamma form a set of intrinsic Tait-Bryan angles of type Z-X'-Y''
 
@@ -64,9 +64,9 @@ export const DeviceOrientationControls = function( object ) {
 
 	this.connect = function() {
 
-		onScreenOrientationChangeEvent(); // run once on load
+		//onScreenOrientationChangeEvent(); // run once on load
 
-		window.addEventListener( 'orientationchange', onScreenOrientationChangeEvent, false );
+		//window.addEventListener( 'orientationchange', onScreenOrientationChangeEvent, false );
 		window.addEventListener( 'deviceorientation', onDeviceOrientationChangeEvent, false );
 
 		scope.enabled = true;
@@ -75,7 +75,7 @@ export const DeviceOrientationControls = function( object ) {
 
 	this.disconnect = function() {
 
-		window.removeEventListener( 'orientationchange', onScreenOrientationChangeEvent, false );
+		//window.removeEventListener( 'orientationchange', onScreenOrientationChangeEvent, false );
 		window.removeEventListener( 'deviceorientation', onDeviceOrientationChangeEvent, false );
 
 		scope.enabled = false;
@@ -86,14 +86,23 @@ export const DeviceOrientationControls = function( object ) {
 
 		if ( scope.enabled === false ) return;
 
-		var alpha = scope.deviceOrientation.alpha ? THREE.MathUtils.degToRad( scope.deviceOrientation.alpha ) + this.alphaOffsetAngle : 0; // Z
-		var beta = scope.deviceOrientation.beta ? THREE.MathUtils.degToRad( scope.deviceOrientation.beta ) + this.betaOffsetAngle : 0; // X'
-		var gamma = scope.deviceOrientation.gamma ? THREE.MathUtils.degToRad( scope.deviceOrientation.gamma ) + this.gammaOffsetAngle : 0; // Y''
-		var orient = scope.screenOrientation ? THREE.MathUtils.degToRad( scope.screenOrientation ) : 0; // O
+		if(typeof scope.deviceOrientation.alpha === 'number') {
+			if(typeof this.alphaOffsetAngle === 'undefined') {
+				this.alphaOffsetAngle = -scope.deviceOrientation.alpha;
+				this.betaOffsetAngle = -scope.deviceOrientation.beta;
+				this.gammaOffsetAngle = -scope.deviceOrientation.gamma;
+			}
 
-		setObjectQuaternion( scope.object.quaternion, alpha, beta, gamma, orient );
-		this.alpha = alpha;
+			var alpha = scope.deviceOrientation.alpha ? THREE.MathUtils.degToRad( scope.deviceOrientation.alpha + this.alphaOffsetAngle ) : 0; // Z
+			var beta = scope.deviceOrientation.beta ? THREE.MathUtils.degToRad( scope.deviceOrientation.beta + this.betaOffsetAngle ) : 0; // X'
+			var gamma = scope.deviceOrientation.gamma ? THREE.MathUtils.degToRad( scope.deviceOrientation.gamma + this.gammaOffsetAngle ) : 0; // Y''
+			var orient = scope.screenOrientation ? THREE.MathUtils.degToRad( scope.screenOrientation ) : 0; // O
 
+			setObjectQuaternion( scope.object.quaternion, alpha, beta, gamma, orient );
+			this.alpha = alpha;
+
+			console.log(this.object.rotation)
+		}
 	};
 
 	this.updateAlphaOffsetAngle = function( angle ) {

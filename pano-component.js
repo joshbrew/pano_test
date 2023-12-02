@@ -13,7 +13,7 @@ export class SphericalVideoRenderer extends HTMLElement {
     useGyro = false;
     usePiSocket = false;
     useMotion = false; //can also use movement
-    maxFOV = 175; // fisheye effect limit
+    maxFOV = 120; // fisheye effect limit
     startFOV = 75;
     startVideoFOV = 20;
     video;
@@ -52,8 +52,8 @@ export class SphericalVideoRenderer extends HTMLElement {
             0.1, 
             1000
         );
-        this.camera.lookAt(0,-1);
-        this.camera.position.z = 0;
+
+        //this.camera.position.z = -10;
         this.camera.rotation.y = Math.PI;
 
         this.renderer = new THREE.WebGLRenderer({ alpha:true, canvas: this.canvas, preserveDrawingBuffer: true, antialias:true });
@@ -148,9 +148,9 @@ export class SphericalVideoRenderer extends HTMLElement {
         }
 
         this.partialSphere = new THREE.Mesh(partialSphereGeometry, this.renderMaterial);
-        this.partialSphere.rotation.y = -Math.PI;
-        this.scene.add(this.partialSphere);
+        this.partialSphere.rotation.y = 0;
         this.partialSphere.material.side = THREE.DoubleSide;
+        this.scene.add(this.partialSphere);
 
         if (this.useOrientation) { //probably safest option for mobile
             this.controls = new DeviceOrientationControls(this.partialSphere);
@@ -416,23 +416,23 @@ export class SphericalVideoRenderer extends HTMLElement {
     updateCameraFOV() {
 
          // Calculate the new FOV based on rotation, for example:
-        // const newFOV = Math.min(
-        //     this.maxFOV, 2*180 * (Math.abs(this.partialSphere.rotation.x) + Math.abs(this.partialSphere.rotation.y))/Math.PI);
+        const newFOV = Math.min(
+            this.maxFOV, 2*180 * (Math.abs(this.partialSphere.rotation.x) + Math.abs(this.partialSphere.rotation.y))/Math.PI);
         
-        // if(newFOV > this.camera.fov) {
-        //     // Update camera properties
-        //     this.camera.fov = newFOV;
-        //     this.camera.updateProjectionMatrix(); // This is necessary to apply the new FOV;
-        //     this.renderer.clear();
-        //     this.shadowRoot.getElementById('fov').value = newFOV;
-        // }
+        if(newFOV > this.camera.fov) {
+            // Update camera properties
+            this.camera.fov = newFOV;
+            this.camera.updateProjectionMatrix(); // This is necessary to apply the new FOV;
+            this.renderer.clear();
+            this.shadowRoot.getElementById('fov').value = newFOV;
+        }
 
     }
 
     onVideoFrame = () => {
 
         if(!this.animating) return;
-        this.updatePartialSphereRotation();
+        //this.updatePartialSphereRotation();
         if(this.partialSphere) this.updateCameraFOV();
         this.renderPartialSphereToTexture();
 
