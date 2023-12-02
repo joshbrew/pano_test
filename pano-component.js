@@ -269,13 +269,13 @@ export class SphericalVideoRenderer extends HTMLElement {
         } else if (this.useOrientation) { //probably safest option for mobile
             window.addEventListener('deviceorientation',(ev)=>{ 
                 if(!this.rotationRate.initialX) {
-                    this.rotationRate.initialX = ev.alpha * Math.PI / 180;
-                    this.rotationRate.initialY = ev.beta * Math.PI / 180;
-                    this.rotationRate.initialZ = ev.gamma * Math.PI / 180;
+                    this.rotationRate.initialX = ev.beta * Math.PI / 180;
+                    this.rotationRate.initialY = ev.gamma * Math.PI / 180;
+                    this.rotationRate.initialZ = ev.alpha * Math.PI / 180;
                 }
-                this.rotationRate.rotX = ev.alpha * Math.PI / 180;
-                this.rotationRate.rotY = ev.beta * Math.PI / 180;
-                this.rotationRate.rotZ = ev.gamma * Math.PI / 180;
+                this.rotationRate.rotX = ev.beta * Math.PI / 180;
+                this.rotationRate.rotY = ev.gamma * Math.PI / 180;
+                this.rotationRate.rotZ = ev.alpha * Math.PI / 180;
                 this.rotationRate.ticks++;
             });
         } else if (this.usePiSocket) { //a raspberry pi reporting over a websocket unless we can figure out what browser needs to recognize
