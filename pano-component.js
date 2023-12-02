@@ -268,14 +268,22 @@ export class SphericalVideoRenderer extends HTMLElement {
             this.gyro.start();
         } else if (this.useOrientation) { //probably safest option for mobile
             window.addEventListener('deviceorientation',(ev)=>{ 
-                if(!this.rotationRate.initialX) {
-                    this.rotationRate.initialX = ev.beta * Math.PI / 180;
-                    this.rotationRate.initialY = ev.gamma * Math.PI / 180;
-                    this.rotationRate.initialZ = ev.alpha * Math.PI / 180;
+                // Convert degrees to radians
+                const alpha = THREE.MathUtils.degToRad(ev.alpha);
+                const beta = THREE.MathUtils.degToRad(ev.beta);
+                const gamma = THREE.MathUtils.degToRad(ev.gamma);
+
+                if (!this.rotationRate.initialX) {
+                    this.rotationRate.initialX = beta;
+                    this.rotationRate.initialY = gamma;
+                    this.rotationRate.initialZ = alpha;
                 }
-                this.rotationRate.rotX = ev.beta * Math.PI / 180;
-                this.rotationRate.rotY = ev.gamma * Math.PI / 180;
-                this.rotationRate.rotZ = ev.alpha * Math.PI / 180;
+
+                // Adjust the device orientation values for Three.js coordinate system
+                // Three.js uses YXZ order for Euler angles by default
+                this.rotationRate.rotX = beta;
+                this.rotationRate.rotY = alpha;
+                this.rotationRate.rotZ = -gamma; // Might need to negate gamma depending on the orientation
                 this.rotationRate.ticks++;
             });
         } else if (this.usePiSocket) { //a raspberry pi reporting over a websocket unless we can figure out what browser needs to recognize
