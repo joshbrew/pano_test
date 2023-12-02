@@ -1,4 +1,5 @@
-import * as THREE from 'three'
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 // import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 // import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 // import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
@@ -10,7 +11,8 @@ export class SphericalVideoRenderer extends HTMLElement {
     useOrientation = true;
     useGyro = false;
     usePiSocket = false;
-    maxFOV = 120; // fisheye effect limit
+    useMotion = false; //can also use movement
+    maxFOV = 175; // fisheye effect limit
     startFOV = 75;
     startVideoFOV = 20;
     video;
@@ -35,12 +37,15 @@ export class SphericalVideoRenderer extends HTMLElement {
     constructor() {
         super();
         this.attachShadow({ mode: 'open' });
+
+
+        
     }
 
     setupScene() {
 
         this.scene = new THREE.Scene();
-        this.camera = new THREE.PerspectiveCamera(
+        this.camera = new THREE.PerspectiveCamera( 
             this.startFOV, 
             window.innerWidth / window.innerHeight, 
             0.1, 
@@ -55,6 +60,9 @@ export class SphericalVideoRenderer extends HTMLElement {
         this.renderer.setSize(window.innerWidth, window.innerHeight);
 
         this.shadowRoot.appendChild(this.renderer.domElement);
+
+        //this.controls = new OrbitControls( this.camera, this.renderer.domElement );
+        //this.controls.update();
         
         this.renderTarget = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight);
         
@@ -186,9 +194,9 @@ export class SphericalVideoRenderer extends HTMLElement {
                 </style>
                 <div class="container">
                     <div class="slider-container">
-                        <div>X Rotation: <input type="range" id="xSlider" class="slider" min="-1.8" max="1.8" step="0.01" value="0"></div>
-                        <div>Y Rotation: <input type="range" id="ySlider" class="slider" min="-1.8" max="1.8" step="0.01" value="0"></div>
-                        <div>Z Rotation: <input type="range" id="zSlider" class="slider" min="-1.8" max="1.8" step="0.01" value="0"></div>
+                        <div>X Rotation: <input type="range" id="xSlider" class="slider" min="-${Math.PI}" max="${Math.PI}" step="0.0001" value="0"></div>
+                        <div>Y Rotation: <input type="range" id="ySlider" class="slider" min="-${Math.PI}" max="${Math.PI}" step="0.0001" value="0"></div>
+                        <div>Z Rotation: <input type="range" id="zSlider" class="slider" min="-${Math.PI}" max="${Math.PI}" step="0.0001" value="0"></div>
                         <button id="clear">Reset Image</button>
                         Render FOV: <input id="fov" type="number" value="${this.startFOV}"></input>
                         <button id="resetfov">Reset</button>
@@ -223,6 +231,7 @@ export class SphericalVideoRenderer extends HTMLElement {
         this.canvas = this.shadowRoot.querySelector('canvas');
         if(!this.source) this.source = this.shadowRoot.querySelector('video');
 
+
     }
 
     connectedCallback() {
@@ -244,6 +253,45 @@ export class SphericalVideoRenderer extends HTMLElement {
         this.animate();
 
         this.onVideoFrame();
+
+        
+        if(this.useGyro) {
+            this.gyro = new Gyroscope({frequency:freq}); //we could do accel + gyro if we wanted to get weird.
+            //use one or the other option
+            this.gyro.addEventListener("reading", () => {
+                this.rotationRate.x += gyroscope.x; //rad/s
+                this.rotationRate.y += gyroscope.y;
+                this.rotationRate.z += gyroscope.z;
+                this.rotationRate.ticks++;
+            });
+
+            this.gyro.start();
+        } else if (this.useOrientation) { //probably safest option for mobile
+            window.addEventListener('deviceorientation',(ev)=>{ 
+                if(!this.rotationRate.initialX) {
+                    this.rotationRate.initialX = ev.alpha * Math.PI / 180;
+                    this.rotationRate.initialY = ev.beta * Math.PI / 180;
+                    this.rotationRate.initialZ = ev.gamma * Math.PI / 180;
+                }
+                this.rotationRate.rotX = ev.alpha * Math.PI / 180;
+                this.rotationRate.rotY = ev.beta * Math.PI / 180;
+                this.rotationRate.rotZ = ev.gamma * Math.PI / 180;
+                this.rotationRate.ticks++;
+            });
+        } else if (this.usePiSocket) { //a raspberry pi reporting over a websocket unless we can figure out what browser needs to recognize
+            this.ws = new WebSocket('http://127.0.0.1:8181');
+            this.ws.addEventListener('message',(ev)=>{
+                //let's just print a dict from the RPi
+                if(ev.data.length < 5) return;
+                const parsed = JSON.parse(ev.data);
+                this.rotationRate.x += parsed.x; //rad/s
+                this.rotationRate.y += parsed.y;
+                this.rotationRate.z += parsed.z;
+                this.rotationRate.ticks++;
+
+            });
+        }
+
 
     }
 
@@ -353,6 +401,8 @@ export class SphericalVideoRenderer extends HTMLElement {
 
     }
 
+
+
     renderPartialSphereToTexture() {
 
         // Render the partial sphere to the render target
@@ -394,6 +444,7 @@ export class SphericalVideoRenderer extends HTMLElement {
 
         if(this.animating) {
             // Request the animation frame synced with the video frame event (onframe)
+            //this.controls.update();
             this.renderer.clearDepth();
             this.renderer.render(this.scene,this.camera);
             //this.composer.render(); //creates some issues with depth

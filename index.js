@@ -1,6 +1,6 @@
 import './pano-component.js'
-import { MediaElementCreator } from './MediaElementCreator.js';
-import { BoundingBoxTool } from './BoundingBoxTool'
+import { MediaElementCreator } from '../MediaElementCreator.js';
+import { BoundingBoxTool } from '../BoundingBoxTool'
 
 import "./index.css"
 

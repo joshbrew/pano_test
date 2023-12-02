@@ -244,8 +244,8 @@ export class BoundingBoxTool {
                 };
 
                 if(this.options.maxBoxes) {
-                    if(this.boxes.length > this.options.maxBoxes) {
-                        this.deleteBox(this.boxes[0].id);
+                    if(this.boxes.length >= this.options.maxBoxes) {
+                        while(this.boxes.length >= this.options.maxBoxes) this.deleteBox(this.boxes[0].id);
                     }
                 }
 
