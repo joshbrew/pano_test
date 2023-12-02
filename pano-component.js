@@ -155,6 +155,20 @@ export class SphericalVideoRenderer extends HTMLElement {
 
         if (this.useOrientation) { //probably safest option for mobile
             this.controls = new DeviceOrientationControls(this.partialSphere);
+            this.controls.update();
+             // Assuming the point we are tracking on the sphere's surface is initially at (0, 0, 1) before rotation
+            var initialDirection = new THREE.Vector3(0, 0, 1);
+            var sphereCenter = this.partialSphere.position; // Center of the sphere
+            var direction = initialDirection.clone().applyQuaternion(this.partialSphere.quaternion).normalize();
+
+            // Now set the camera position to the center of the sphere
+            this.camera.position.copy(sphereCenter);
+
+            // Calculate a point in space in the direction we want the camera to look
+            var lookAtPoint = new THREE.Vector3().addVectors(sphereCenter, direction);
+
+            // Make the camera look in the direction of the sphere's rotation
+            this.camera.lookAt(lookAtPoint);
         } 
 
     }
@@ -337,8 +351,8 @@ export class SphericalVideoRenderer extends HTMLElement {
 
         this.renderTexture.colorSpace = THREE.SRGBColorSpace; //
         this.renderMaterial = new THREE.MeshBasicMaterial({ map: this.renderTexture });
-        this.renderTexture.repeat.set(-1, -1); // This will flip the texture horizontally to match source perspective
-        this.renderTexture.offset.set(1, 1); // Offset needs to be adjusted when flipping
+        this.renderTexture.repeat.set(1, 1); // This will flip the texture horizontally to match source perspective
+        this.renderTexture.offset.set(0, 0); // Offset needs to be adjusted when flipping
     }
 
     updateRotation = (axis, value) => {
@@ -442,6 +456,7 @@ export class SphericalVideoRenderer extends HTMLElement {
 
         if(!this.animating) return;
         //this.updatePartialSphereRotation();
+        this.controls?.update(); //we need to update here so we aren't repainting frames in different positions
         if(this.partialSphere) this.updateCameraFOV();
         this.renderPartialSphereToTexture();
 
@@ -454,7 +469,7 @@ export class SphericalVideoRenderer extends HTMLElement {
 
         if(this.animating) {
             // Request the animation frame synced with the video frame event (onframe)
-            this.controls?.update();
+            //this.controls?.update();
             
             this.renderer.clearDepth();
             this.renderer.render(this.scene,this.camera);
