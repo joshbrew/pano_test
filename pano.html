@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Texture Copy in Three.js with Camera Control</title>
+    <style>
+        body { margin: 0; }
+        canvas { display: block; }
+        .slider-container {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            z-index: 100;
+        }
+        .slider {
+            width: 200px;
+        }
+    </style>
+</head>
+<body>
+    <div class="slider-container">
+        <div>X Rotation: <input type="range" id="xSlider" class="slider" min="-1.8" max="1.8" step="0.01" value="0"></div>
+        <div>Y Rotation: <input type="range" id="ySlider" class="slider" min="-1.8" max="1.8" step="0.01" value="0"></div>
+        <div>Z Rotation: <input type="range" id="zSlider" class="slider" min="-1.8" max="1.8" step="0.01" value="0"></div>
+        <button id="clear">Clear</button>Render FOV: <input id="fov" type="number" value="75"></input><button id="resetfov">Reset</button>
+        <br/>Video Feed FOV: <input type="number" id="vfov" value="20"></input><button id="resetvfov">Reset</button>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.158.0/three.min.js"></script>
+    <script>
+        const freq = 60;
+
+        const useGyro = false;
+        const useOrientation = true;
+        const usePiSocket = false;
+
+        let rotationRate = {
+            initialX:0,
+            initialY:0,
+            initialZ:0,
+            x:0,
+            y:0,
+            z:0,
+            rotX:0,
+            rotY:0,
+            rotZ:0,
+            ticks:0
+        };
+
+        if(useGyro) {
+            let gyro = new Gyroscope({frequency:freq}); //we could do accel + gyro if we wanted to get weird.
+            //use one or the other option
+            gyro.addEventListener("reading", () => {
+                rotationRate.x += gyroscope.x; //rad/s
+                rotationRate.y += gyroscope.y;
+                rotationRate.z += gyroscope.z;
+                rotationRate.ticks++;
+            });
+
+            gyro.start();
+        } else if (useOrientation) { //probably safest option for mobile
+            window.addEventListener('deviceorientation',(ev)=>{ 
+                if(!rotationRate.initialX) {
+                    rotationRate.initialX = ev.alpha * Math.PI / 180;
+                    rotationRate.initialY = ev.beta * Math.PI / 180;
+                    rotationRate.initialZ = ev.gamma * Math.PI / 180;
+                }
+                rotationRate.rotX = ev.alpha * Math.PI / 180;
+                rotationRate.rotY = ev.beta * Math.PI / 180;
+                rotationRate.rotZ = ev.gamma * Math.PI / 180;
+                rotationRate.ticks++;
+            });
+        } else if (usePiSocket) { //a raspberry pi reporting over a websocket unless we can figure out what browser needs to recognize
+            let ws = new WebSocket('http://127.0.0.1:8181');
+            ws.addEventListener('message',(ev)=>{
+                //let's just print a dict from the RPi
+                if(ev.data.length < 5) return;
+                const parsed = JSON.parse(ev.data);
+                rotationRate.x += parsed.x; //rad/s
+                rotationRate.y += parsed.y;
+                rotationRate.z += parsed.z;
+                rotationRate.ticks++;
+
+            });
+        }
+
+        let startFOV = 75;
+        let startVideoFOV = 20;
+
+        // Maximum allowed FOV
+        let maxFOV = 120; //fisheye
+
+
+        // Scene Setup
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(startFOV, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.z = 0;
+        camera.rotation.y = Math.PI;
+        const renderer = new THREE.WebGLRenderer({ preserveDrawingBuffer: true }); // Add preserveDrawingBuffer
+        renderer.autoClear = false;
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.clear();
+        document.body.appendChild(renderer.domElement);
+
+        document.getElementById('clear').onclick = () => { renderer.clear(); }
+        document.getElementById('fov').onchange = (ev) => { 
+            const newFOV = Math.min(maxFOV,parseFloat(ev.target.value));
+            camera.fov = newFOV;
+            camera.updateProjectionMatrix(); // This is necessary to apply the new FOV;
+            renderer.clear(); 
+        }
+        document.getElementById('resetfov').onclick = () => { 
+            camera.fov = startFOV;
+            camera.updateProjectionMatrix(); // This is necessary to apply the new FOV;
+        }
+
+
+
+        // Video Texture Setup
+        const video = document.createElement('video');
+        video.src = 'http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4'; // Online video URL
+        video.crossOrigin = "anonymous"; // Handle CORS
+        video.load();
+        let played = false;
+        document.body.onclick = () => {
+        if(!played) {
+            played = true;
+            video.play();
+        }
+        }
+        video.muted = true;
+        video.loop = true;
+
+
+        const videoTexture = new THREE.VideoTexture(video);
+
+        // Material with Video Texture
+        const videoMaterial = new THREE.MeshBasicMaterial({ map: videoTexture });
+
+        let partialSphere;
+        
+        const createPartialSphere = (
+            fov=20, //note, a 20 degree lens might be more like 18 degrees in practice if it's not a full view
+            aspectX=video.videoWidth || 16, //aspect is just XRes/YRes, 1920x1080 is 16/9 simplified
+            aspectY=video.videoHeight || 9
+        ) => {
+
+            if(partialSphere) {
+                scene.remove(partialSphere);
+            }
+
+            // Constants for 16:9 aspect ratio FOV in radians
+            let horizontalFOVDegrees = fov; // For example, a 20-degree horizontal FOV
+            let verticalFOVDegrees = (horizontalFOVDegrees / aspectX) * aspectY; // Calculate the vertical FOV based on a 16:9 aspect ratio
+
+            let horizontalFOVRadians = THREE.MathUtils.degToRad(horizontalFOVDegrees);
+            let verticalFOVRadians = THREE.MathUtils.degToRad(verticalFOVDegrees);
+
+            // SphereGeometry parameters for the partial sphere
+            let radius = 5; // Keep the radius the same for both spheres
+            let widthSegments = 50; // Number of horizontal segments
+            let heightSegments = 50; // Number of vertical segments
+
+            // Create the partial sphere geometry with the 16:9 aspect FOV
+            let partialSphereGeometry = new THREE.SphereGeometry(
+                radius, widthSegments, heightSegments,
+                Math.PI / 2 - horizontalFOVRadians / 2, horizontalFOVRadians, // phiStart and phiLength
+                Math.PI / 2 - verticalFOVRadians / 2, verticalFOVRadians // thetaStart and thetaLength
+            );
+
+            // Create the mesh with the partial sphere geometry
+            partialSphere = new THREE.Mesh(partialSphereGeometry, videoMaterial);
+
+            scene.add(partialSphere);
+            partialSphere.material.side = THREE.DoubleSide;
+        }
+
+        document.getElementById('vfov').onchange = (ev) => {
+            createPartialSphere(parseFloat(ev.target.value));
+            renderer.clear();
+        }
+
+        document.getElementById('resetvfov').onclick = () => {
+            document.getElementById('vfov').value = startVideoFOV;
+            createPartialSphere(startVideoFOV);
+            renderer.clear();
+        }
+
+        createPartialSphere(startVideoFOV);
+
+        // Complete Sphere
+        // const completeSphereGeometry = new THREE.SphereGeometry(radius, widthSegments, heightSegments);
+        // const completeSphereMaterial = new THREE.MeshBasicMaterial({ 
+        //     color: 0xcccccc,
+        //     transparent: true,
+        //     opacity: 0.1
+        // });
+
+        // const completeSphere = new THREE.Mesh(completeSphereGeometry, completeSphereMaterial);
+        // scene.add(completeSphere);
+        // completeSphere.material.side = THREE.DoubleSide;
+        // // Set the same center for rotation for both spheres
+        // partialSphere.position.set(0, 0, 0);
+        // completeSphere.position.set(0, 0, 0);
+
+        // // Create an offscreen canvas
+        // const offscreenCanvas = document.createElement('canvas');
+        // offscreenCanvas.width = window.innerWidth;
+        // offscreenCanvas.height = window.innerHeight;
+        // const offscreenContext = offscreenCanvas.getContext('2d');
+
+        // Render Target for capturing partial sphere texture
+        const renderTarget = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight);
+
+        // Function to Render Partial Sphere to Texture
+        function renderPartialSphereToTexture() {
+        // Render the partial sphere to the render target
+        renderer.setRenderTarget(renderTarget);
+        // If you want to clear the render target every time you can do it manually here
+        // renderer.clear();
+        renderer.render(scene, camera);
+        renderer.setRenderTarget(null); // Reset to default render target
+
+
+        // // Update the complete sphere's material with the rendered texture
+        // completeSphere.material.map = renderTarget.texture;
+        // completeSphere.material.needsUpdate = true; // Important to update the material
+        }
+
+        // Use the offscreen canvas as the texture for the complete sphere
+        // const completeSphereTexture = new THREE.CanvasTexture(offscreenCanvas);
+        // completeSphere.material.map = completeSphereTexture;
+
+        // Sliders for Partial Sphere Rotation
+        const xSlider = document.getElementById('xSlider');
+        const ySlider = document.getElementById('ySlider');
+        const zSlider = document.getElementById('zSlider');
+
+        xSlider.oninput = () => {
+            partialSphere.rotation.x = parseFloat(xSlider.value);
+            updateCameraFOV();
+        }
+        ySlider.oninput = () => {
+            partialSphere.rotation.y = parseFloat(ySlider.value);
+            updateCameraFOV();
+        }
+        zSlider.oninput = () => {
+            partialSphere.rotation.z = parseFloat(zSlider.value);
+            updateCameraFOV();
+        }
+        // Update Partial Sphere Rotation based on Sliders
+        function updatePartialSphereRotation() {
+            if((useGyro || useOrientation)) {
+                if(rotationRate.ticks > 0) {
+                    partialSphere.rotation.x = rotationRate.rotX - rotationRate.initialX;
+                    partialSphere.rotation.y = rotationRate.rotY - rotationRate.initialY;
+                    partialSphere.rotation.z = rotationRate.rotZ - rotationRate.initialZ;
+
+                    if(useGyro) {
+                        partialSphere.rotation.x += rotationRate.ticks * rotationRate.x / freq; //freq samples per second, so 
+                        partialSphere.rotation.y += rotationRate.ticks * rotationRate.y / freq;
+                        partialSphere.rotation.z += rotationRate.ticks * rotationRate.z / freq; 
+
+                        rotationRate.x = 0; 
+                        rotationRate.y = 0; 
+                        rotationRate.z = 0; 
+                    }
+
+                    rotationRate.ticks = 0;
+                    
+                    updateCameraFOV();
+                }
+
+            }
+        }
+        
+
+        // Function to update the camera's FOV based on rotation
+        function updateCameraFOV() {
+            // Calculate the new FOV based on rotation, for example:
+            const newFOV = Math.min(
+                maxFOV, 2*180 * (Math.abs(partialSphere.rotation.x) + Math.abs(partialSphere.rotation.y))/Math.PI);
+            
+            if(newFOV > camera.fov) {
+                // Update camera properties
+                camera.fov = newFOV;
+                camera.updateProjectionMatrix(); // This is necessary to apply the new FOV;
+                renderer.clear();
+            }
+        }
+
+                
+        function onWindowResize() {
+            // Update the camera's aspect ratio and the renderer's size when the window is resized
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+
+            // Update any render targets your application might be using
+            renderTarget.setSize(window.innerWidth, window.innerHeight);
+            renderer.clear();
+        }
+
+        // Add the event listener for the resize events
+        window.addEventListener('resize', onWindowResize, false);
+
+        // Animation Loop
+        function animate() {
+            requestAnimationFrame(animate);
+
+            // Update partial sphere rotation
+            updatePartialSphereRotation();
+
+            // Render the partial sphere to the texture
+            renderPartialSphereToTexture();
+
+            // Only clear the depth buffer to allow painting over the scene
+            renderer.clearDepth(); 
+            renderer.render(scene, camera);
+        }
+
+        animate(); // Start the animation loop
+
+
+    </script>
+</body>
+</html>
