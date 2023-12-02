@@ -155,20 +155,7 @@ export class SphericalVideoRenderer extends HTMLElement {
 
         if (this.useOrientation) { //probably safest option for mobile
             this.controls = new DeviceOrientationControls(this.partialSphere, undefined, () => {
-                // Assuming the point we are tracking on the sphere's surface is initially at (0, 0, 1) before rotation
-                var initialDirection = new THREE.Vector3(0, 0, 1);
-                var sphereCenter = this.partialSphere.position; // Center of the sphere
-                var direction = initialDirection.clone().applyQuaternion(this.partialSphere.quaternion).normalize();
-
-                // Now set the camera position to the center of the sphere
-                this.camera.position.copy(sphereCenter);
-
-                // Calculate a point in space in the direction we want the camera to look
-                var lookAtPoint = new THREE.Vector3().addVectors(sphereCenter, direction);
-
-                // Make the camera look in the direction of the sphere's rotation
-                this.camera.lookAt(lookAtPoint);
-                this.camera.rotation.z = 0;
+                this.lookAtSphere();
             });
             this.controls.update();
            
@@ -243,12 +230,7 @@ export class SphericalVideoRenderer extends HTMLElement {
         this.shadowRoot.getElementById('ySlider').oninput = (e) => this.updateRotation('y', e.target.value);
         this.shadowRoot.getElementById('zSlider').oninput = (e) => this.updateRotation('z', e.target.value);
         this.shadowRoot.getElementById('clear').onclick = () => { 
-            this.renderer.clear(); 
-            if(this.partialSphere) {
-                this.partialSphere.rotation.x = 0;
-                this.partialSphere.rotation.y = 0;
-                this.partialSphere.rotation.z = 0; // -Math.PI;
-            }
+            this.resetRender();
         }
         this.shadowRoot.getElementById('fov').onchange = (e) => this.updateFOV(e.target.value);
         this.shadowRoot.getElementById('resetfov').onclick = () => this.resetFOV();
@@ -260,6 +242,30 @@ export class SphericalVideoRenderer extends HTMLElement {
         if(!this.source) this.source = this.shadowRoot.querySelector('video');
 
 
+    }
+
+    resetRender = () => {
+        this.renderer.clear(); 
+        if(this.partialSphere) {
+            this.lookAtSphere();
+        }
+    }
+
+    lookAtSphere = () => {
+        // Assuming the point we are tracking on the sphere's surface is initially at (0, 0, 1) before rotation
+        var initialDirection = new THREE.Vector3(0, 0, 1);
+        var sphereCenter = this.partialSphere.position; // Center of the sphere
+        var direction = initialDirection.clone().applyQuaternion(this.partialSphere.quaternion).normalize();
+
+        // Now set the camera position to the center of the sphere
+        this.camera.position.copy(sphereCenter);
+
+        // Calculate a point in space in the direction we want the camera to look
+        var lookAtPoint = new THREE.Vector3().addVectors(sphereCenter, direction);
+
+        // Make the camera look in the direction of the sphere's rotation
+        this.camera.lookAt(lookAtPoint);
+        this.camera.rotation.z = 0;
     }
 
     connectedCallback() {
