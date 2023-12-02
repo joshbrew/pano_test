@@ -55,6 +55,7 @@ export class SphericalVideoRenderer extends HTMLElement {
 
         //this.camera.position.z = -10;
         this.camera.rotation.y = Math.PI;
+        this.camera.rotation.z = Math.PI;
 
         this.renderer = new THREE.WebGLRenderer({ alpha:true, canvas: this.canvas, preserveDrawingBuffer: true, antialias:true });
         this.renderer.autoClear = false;
@@ -148,7 +149,7 @@ export class SphericalVideoRenderer extends HTMLElement {
         }
 
         this.partialSphere = new THREE.Mesh(partialSphereGeometry, this.renderMaterial);
-        this.partialSphere.rotation.y = 0;
+        //this.partialSphere.rotation.z = Math.PI;
         this.partialSphere.material.side = THREE.DoubleSide;
         this.scene.add(this.partialSphere);
 
@@ -187,6 +188,7 @@ export class SphericalVideoRenderer extends HTMLElement {
                     canvas {
                         width: 100%;
                         height: auto;
+                        transform: scaleX(-1);
                     }
                     video {
                         position:relative;
@@ -228,7 +230,7 @@ export class SphericalVideoRenderer extends HTMLElement {
             if(this.partialSphere) {
                 this.partialSphere.rotation.x = 0;
                 this.partialSphere.rotation.y = 0;
-                this.partialSphere.rotation.z = 0;
+                this.partialSphere.rotation.z = 0; // -Math.PI;
             }
         }
         this.shadowRoot.getElementById('fov').onchange = (e) => this.updateFOV(e.target.value);
@@ -333,10 +335,10 @@ export class SphericalVideoRenderer extends HTMLElement {
             this.renderTexture = new THREE.Texture(this.source); //image source
         }
 
-        this.renderTexture.encoding = 3001; //srgb for correct saturation
+        this.renderTexture.colorSpace = THREE.SRGBColorSpace; //
         this.renderMaterial = new THREE.MeshBasicMaterial({ map: this.renderTexture });
-        this.renderTexture.repeat.set(-1, 1); // This will flip the texture horizontally to match source perspective
-        this.renderTexture.offset.set(1, 0); // Offset needs to be adjusted when flipping
+        this.renderTexture.repeat.set(-1, -1); // This will flip the texture horizontally to match source perspective
+        this.renderTexture.offset.set(1, 1); // Offset needs to be adjusted when flipping
     }
 
     updateRotation = (axis, value) => {
@@ -350,8 +352,10 @@ export class SphericalVideoRenderer extends HTMLElement {
 
     updateFOV(value) {
 
-        const newFOV = Math.min(this.maxFOV, parseFloat(value));
+        let val = parseFloat(value);
+        const newFOV = Math.min(this.maxFOV, val);
         this.camera.fov = newFOV;
+        
         this.camera.updateProjectionMatrix();
         this.renderer.clear();
 
@@ -360,6 +364,7 @@ export class SphericalVideoRenderer extends HTMLElement {
     resetFOV() {
 
         this.camera.fov = this.startFOV;
+        this.camera.position.z = 0;
         this.shadowRoot.getElementById('fov').value = this.startFOV;
         this.camera.updateProjectionMatrix();
         this.renderer.clear();
@@ -416,16 +421,20 @@ export class SphericalVideoRenderer extends HTMLElement {
     updateCameraFOV() {
 
          // Calculate the new FOV based on rotation, for example:
+        const val = 2*180 * (Math.abs(this.partialSphere.rotation.x) + Math.abs(this.partialSphere.rotation.y))/Math.PI;
         const newFOV = Math.min(
-            this.maxFOV, 2*180 * (Math.abs(this.partialSphere.rotation.x) + Math.abs(this.partialSphere.rotation.y))/Math.PI);
-        
+            this.maxFOV, val);
+      
         if(newFOV > this.camera.fov) {
             // Update camera properties
             this.camera.fov = newFOV;
             this.camera.updateProjectionMatrix(); // This is necessary to apply the new FOV;
             this.renderer.clear();
             this.shadowRoot.getElementById('fov').value = newFOV;
+        } else if(val > this.maxFOV) {
+            console.log(val);
         }
+
 
     }
 
