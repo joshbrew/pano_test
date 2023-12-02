@@ -277,14 +277,14 @@ export class SphericalVideoRenderer extends HTMLElement {
                 if (!this.rotationRate.initialX) {
                     this.rotationRate.initialX = beta;
                     this.rotationRate.initialY = gamma;
-                    this.rotationRate.initialZ = alpha;
+                    this.rotationRate.initialZ = -alpha;
                 }
 
                 // Adjust the device orientation values for Three.js coordinate system
                 // Three.js uses YXZ order for Euler angles by default
                 this.rotationRate.rotX = beta;
-                this.rotationRate.rotY = alpha;
-                this.rotationRate.rotZ = -gamma; // Might need to negate gamma depending on the orientation
+                this.rotationRate.rotY = gamma;
+                this.rotationRate.rotZ = -alpha; // Might need to negate gamma depending on the orientation
                 this.rotationRate.ticks++;
             });
         } else if (this.usePiSocket) { //a raspberry pi reporting over a websocket unless we can figure out what browser needs to recognize
