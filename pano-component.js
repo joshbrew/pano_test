@@ -182,7 +182,8 @@ export class SphericalVideoRenderer extends HTMLElement {
                     }
                     video {
                         position:relative;
-                        width:250px;
+                        width:300px;
+                        max-height:300px;
                         background-color:blue;
                         right:0;
                         top:0;
