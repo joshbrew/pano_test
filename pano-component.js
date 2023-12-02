@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import {DeviceOrientationControls} from './DeviceOrientationControls';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 // import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 // import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
@@ -51,6 +52,7 @@ export class SphericalVideoRenderer extends HTMLElement {
             0.1, 
             1000
         );
+        this.camera.lookAt(0,-1);
         this.camera.position.z = 0;
         this.camera.rotation.y = Math.PI;
 
@@ -142,11 +144,17 @@ export class SphericalVideoRenderer extends HTMLElement {
 
         if (this.partialSphere) {
             this.scene.remove(this.partialSphere);
+            this.controls?.dispose();
         }
 
         this.partialSphere = new THREE.Mesh(partialSphereGeometry, this.renderMaterial);
+        this.partialSphere.rotation.y = -Math.PI;
         this.scene.add(this.partialSphere);
         this.partialSphere.material.side = THREE.DoubleSide;
+
+        if (this.useOrientation) { //probably safest option for mobile
+            this.controls = new DeviceOrientationControls(this.partialSphere);
+        } 
 
     }
 
@@ -268,25 +276,7 @@ export class SphericalVideoRenderer extends HTMLElement {
 
             this.gyro.start();
         } else if (this.useOrientation) { //probably safest option for mobile
-            window.addEventListener('deviceorientation',(ev)=>{ 
-                // Convert degrees to radians
-                const alpha = THREE.MathUtils.degToRad(ev.alpha);
-                const beta = THREE.MathUtils.degToRad(ev.beta);
-                const gamma = THREE.MathUtils.degToRad(ev.gamma);
-
-                if (!this.rotationRate.initialX) {
-                    this.rotationRate.initialX = -alpha;
-                    this.rotationRate.initialY = gamma;
-                    this.rotationRate.initialZ = beta;
-                }
-
-                // Adjust the device orientation values for Three.js coordinate system
-                // Three.js uses YXZ order for Euler angles by default
-                this.rotationRate.rotX = -alpgha;
-                this.rotationRate.rotY = gamma;
-                this.rotationRate.rotZ = beta; // Might need to negate gamma depending on the orientation
-                this.rotationRate.ticks++;
-            });
+            //let controls = new THREE.DeviceOrientationControls(this.partialSphere);
         } else if (this.usePiSocket) { //a raspberry pi reporting over a websocket unless we can figure out what browser needs to recognize
             this.ws = new WebSocket('http://127.0.0.1:8181');
             this.ws.addEventListener('message',(ev)=>{
@@ -370,6 +360,7 @@ export class SphericalVideoRenderer extends HTMLElement {
     resetFOV() {
 
         this.camera.fov = this.startFOV;
+        this.shadowRoot.getElementById('fov').value = this.startFOV;
         this.camera.updateProjectionMatrix();
         this.renderer.clear();
 
@@ -384,6 +375,7 @@ export class SphericalVideoRenderer extends HTMLElement {
 
     resetVideoFOV() {
 
+        this.resetFOV();
         this.createPartialSphere(this.startVideoFOV);
         this.renderer.clear();
 
@@ -424,16 +416,16 @@ export class SphericalVideoRenderer extends HTMLElement {
     updateCameraFOV() {
 
          // Calculate the new FOV based on rotation, for example:
-        const newFOV = Math.min(
-            this.maxFOV, 2*180 * (Math.abs(this.partialSphere.rotation.x) + Math.abs(this.partialSphere.rotation.y))/Math.PI);
+        // const newFOV = Math.min(
+        //     this.maxFOV, 2*180 * (Math.abs(this.partialSphere.rotation.x) + Math.abs(this.partialSphere.rotation.y))/Math.PI);
         
-        if(newFOV > this.camera.fov) {
-            // Update camera properties
-            this.camera.fov = newFOV;
-            this.camera.updateProjectionMatrix(); // This is necessary to apply the new FOV;
-            this.renderer.clear();
-            this.shadowRoot.getElementById('fov').value = newFOV;
-        }
+        // if(newFOV > this.camera.fov) {
+        //     // Update camera properties
+        //     this.camera.fov = newFOV;
+        //     this.camera.updateProjectionMatrix(); // This is necessary to apply the new FOV;
+        //     this.renderer.clear();
+        //     this.shadowRoot.getElementById('fov').value = newFOV;
+        // }
 
     }
 
@@ -453,9 +445,11 @@ export class SphericalVideoRenderer extends HTMLElement {
 
         if(this.animating) {
             // Request the animation frame synced with the video frame event (onframe)
-            //this.controls.update();
+            this.controls?.update();
+            
             this.renderer.clearDepth();
             this.renderer.render(this.scene,this.camera);
+            
             //this.composer.render(); //creates some issues with depth
             this.animationFrameId = requestAnimationFrame(this.animate);
         }
