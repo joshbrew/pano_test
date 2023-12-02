@@ -275,15 +275,15 @@ export class SphericalVideoRenderer extends HTMLElement {
                 const gamma = THREE.MathUtils.degToRad(ev.gamma);
 
                 if (!this.rotationRate.initialX) {
-                    this.rotationRate.initialX = beta;
-                    this.rotationRate.initialY = -gamma;
+                    this.rotationRate.initialX = -beta;
+                    this.rotationRate.initialY = gamma;
                     //this.rotationRate.initialZ = -alpha;
                 }
 
                 // Adjust the device orientation values for Three.js coordinate system
                 // Three.js uses YXZ order for Euler angles by default
-                this.rotationRate.rotX = beta;
-                this.rotationRate.rotY = -gamma;
+                this.rotationRate.rotX = -beta;
+                this.rotationRate.rotY = gamma;
                 //this.rotationRate.rotZ = -alpha; // Might need to negate gamma depending on the orientation
                 this.rotationRate.ticks++;
             });
