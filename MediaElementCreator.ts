@@ -172,7 +172,6 @@ export class MediaElementCreator {
     video.loop = true;
     video.muted = true; // Mute to allow autoplay without user interaction
     
-
     
     if (typeof src === 'string') {
       video.src = src;
@@ -248,7 +247,7 @@ export class MediaElementCreator {
         tracks.forEach(track => track.stop());
       }
       if(this.ondelete) this.ondelete(this.currentMediaElement.src || (this.currentMediaElement as HTMLVideoElement).srcObject, this.currentMediaElement);
-      this.currentMediaElement.remove();
+      this.currentMediaElement.parentElement?.remove();
       this.currentMediaElement = null;
     }
   }

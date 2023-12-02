@@ -51,6 +51,10 @@ const Media = new MediaElementCreator(div, {
         
         if(elm && newPano) {
             newPano = false;
+            
+            const container = document.getElementsByClassName('video-container')[0];
+            container.style.position = 'fixed';
+            container.style.right = '-180px';
             elm.style.width = "50%";
             elm.style.maxHeight = "300px";
             

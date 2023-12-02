@@ -123,9 +123,13 @@ export class BoundingBoxTool {
     updateCanvasPosition = () => {
     
         // Position the canvas absolutely within the viewport to align with the source element
-        this.overlayCanvas.style.position = 'absolute';
-        this.overlayCanvas.style.left = '50%';
-        this.overlayCanvas.style.transform = 'translateX(-50%)';
+        this.overlayCanvas.style.position = this.sourceElement.style.position === 'fixed' ? 'fixed' : 'absolute';
+
+        this.overlayCanvas.style.left = this.sourceElement.style.left || `${this.sourceElement.clientLeft + ((this.sourceElement as HTMLVideoElement).videoWidth ? (0.5*(this.sourceElement.clientWidth - (this.sourceElement as HTMLVideoElement).videoWidth*(this.sourceElement.clientHeight/(this.sourceElement as HTMLVideoElement).videoHeight))) : 0)}px`;
+        this.overlayCanvas.style.top = this.sourceElement.style.top || `${this.sourceElement.clientTop}px`;
+        this.overlayCanvas.style.right = this.sourceElement.style.right;
+        this.overlayCanvas.style.bottom = this.sourceElement.style.bottom;
+        this.overlayCanvas.style.transform = this.sourceElement.style.transform;
     };
 
     updateBoxesAndLabels = () => {
@@ -451,7 +455,7 @@ export class BoundingBoxTool {
             labelContainer.style.position = 'absolute';
 
             labelContainer.style.color = this.options.labelColor || 'black';
-            labelContainer.style.zIndex = '1000';
+            labelContainer.style.zIndex = `${parseInt(this.sourceElement.style.zIndex + 1)}`;
             labelContainer.style.display = 'flex';
             labelContainer.style.alignItems = 'center';
 
