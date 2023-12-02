@@ -6,7 +6,7 @@ import * as THREE from 'three'
  * W3C Device Orientation control (http://w3c.github.io/deviceorientation/spec-source-orientation.html)
  */
 
-export const DeviceOrientationControls = function( object, offsetDeg ) {
+export const DeviceOrientationControls = function( object, offsetDeg, firstEvent ) {
 
 	var scope = this;
 
@@ -23,6 +23,7 @@ export const DeviceOrientationControls = function( object, offsetDeg ) {
 	this.betaOffsetAngle = offsetDeg?.beta || 0;
 	this.gammaOffsetAngle = offsetDeg?.gamma || 0;
 
+	let firstCall = true;
 
 	var onDeviceOrientationChangeEvent = function( event ) {
 
@@ -85,6 +86,8 @@ export const DeviceOrientationControls = function( object, offsetDeg ) {
 		if ( scope.enabled === false ) return;
 
 		if(typeof scope.deviceOrientation.alpha === 'number') {
+
+			
 			if(typeof this.alphaOffsetAngle === 'undefined') {
 				this.alphaOffsetAngle = -scope.deviceOrientation.alpha;
 				this.betaOffsetAngle = -scope.deviceOrientation.beta;
@@ -98,7 +101,11 @@ export const DeviceOrientationControls = function( object, offsetDeg ) {
 			//console.log(alpha,beta,gamma);
 			setObjectQuaternion( scope.object.quaternion, alpha, beta, gamma, orient );
 			this.alpha = alpha;
-
+			
+			if(firstCall && firstEvent) {
+				firstCall = false;
+				firstEvent(this.object, scope.deviceOrientation);
+			}
 		}
 	};
 
