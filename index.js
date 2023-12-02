@@ -54,7 +54,7 @@ const Media = new MediaElementCreator(div, {
             
             const container = document.getElementsByClassName('video-container')[0];
             container.style.position = 'fixed';
-            container.style.right = '-180px';
+            container.style.left = '75%';
             elm.style.width = "50%";
             elm.style.maxHeight = "300px";
             
