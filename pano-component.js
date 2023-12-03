@@ -245,10 +245,10 @@ export class SphericalVideoRenderer extends HTMLElement {
     }
 
     resetRender = () => {
-        this.renderer.clear(); 
         if(this.partialSphere) {
             this.lookAtSphere();
         }
+        this.renderer.clear(); 
     }
 
     lookAtSphere = () => {
@@ -266,6 +266,9 @@ export class SphericalVideoRenderer extends HTMLElement {
         // Make the camera look in the direction of the sphere's rotation
         this.camera.lookAt(lookAtPoint);
         this.camera.rotation.z = this.partialSphere.rotation.z;
+        if(/(android)/i.test(navigator.userAgent)) {
+            this.camera.rotation.z -= Math.PI/2;
+        }
     }
 
     connectedCallback() {
