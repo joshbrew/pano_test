@@ -265,7 +265,7 @@ export class SphericalVideoRenderer extends HTMLElement {
 
         // Make the camera look in the direction of the sphere's rotation
         this.camera.lookAt(lookAtPoint);
-        this.camera.rotation.z = 0;
+        this.camera.rotation.z = this.partialSphere.rotation.z;
     }
 
     connectedCallback() {
