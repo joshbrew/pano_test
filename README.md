@@ -7,3 +7,5 @@ Make sure you adjust the Video Feed FOV to match your camera's FOV. E.g. my S10e
 
 Otherwise still some bugs with CSS and orientation detection on mobile but it kinda works!
 
+![1](./test1.jpg)
+![2](./test2.jpg)
