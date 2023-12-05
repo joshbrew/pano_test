@@ -10,7 +10,7 @@ document.body.insertAdjacentHTML('afterbegin',``);
 
 let BBTool; let PanoElm; let LensFOV = 20; let offscreen; let offscreenanim;
 
-let div = document.createElement('div'); div.style.height = '40vw';
+let div = document.createElement('div'); div.style.height = '40vw'; div.style.minHeight = "340px";
 let div2 = document.createElement('div');
 
 const setupOffscreen = (source,dx,dy,width,height) => {
@@ -54,8 +54,8 @@ const Media = new MediaElementCreator(div, {
             
             const container = document.getElementsByClassName('video-container')[0];
             container.style.position = 'fixed';
-            container.style.left = '75%';
-            elm.style.width = "50%";
+            container.style.right = '10px';
+            elm.style.minWidth = "300px";
             elm.style.maxHeight = "300px";
             
             let onframe = () => {

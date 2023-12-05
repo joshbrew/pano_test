@@ -19,6 +19,7 @@ export class SphericalVideoRenderer extends HTMLElement {
     video;
     resX;
     resY;
+    lastUpdateTime;
 
     rotationRate = {
         initialX: 0,
@@ -181,10 +182,12 @@ export class SphericalVideoRenderer extends HTMLElement {
             <span style="${this.styles}">
                 <style>
                     .slider-container {
+                        font-family: Consolas;
                         position: relative;
                         top: 10px;
                         left: 10px;
                         z-index: 100;
+                        font-size: 2vw;
                     }
                     .slider {
                         width: 200px;
@@ -209,13 +212,13 @@ export class SphericalVideoRenderer extends HTMLElement {
                 </style>
                 <div class="container">
                     <div class="slider-container">
-                        <div>X Rotation: <input type="range" id="xSlider" class="slider" min="-${Math.PI}" max="${Math.PI}" step="0.0001" value="0"></div>
-                        <div>Y Rotation: <input type="range" id="ySlider" class="slider" min="-${Math.PI}" max="${Math.PI}" step="0.0001" value="0"></div>
-                        <div>Z Rotation: <input type="range" id="zSlider" class="slider" min="-${Math.PI}" max="${Math.PI}" step="0.0001" value="0"></div>
+                        Camera FOV (set to match your lens!): <input type="number" id="vfov" value="${this.startVideoFOV}"></input><br/>
+                        <div>Horizontal: <input type="range" id="ySlider" class="slider" min="-${Math.PI}" max="${Math.PI}" step="0.0001" value="0"> Rate (rad/s):<input value="0" id="yRate" min="-${Math.PI}" max="${Math.PI}" type="number"/></div>
+                        <div>Vertical: <input type="range" id="xSlider" class="slider" min="-${Math.PI}" max="${Math.PI}" step="0.0001" value="0"> Rate (rad/s):<input value="0" id="xRate" min="-${Math.PI}" max="${Math.PI}" type="number"/></div>
+                        <div>Tilt: <input type="range" id="zSlider" class="slider" min="-${Math.PI}" max="${Math.PI}" step="0.0001" value="0"> Rate (rad/s):<input value="0" id="zRate" min="-${Math.PI}" max="${Math.PI}" type="number"/></div>
                         <button id="clear">Reset Image</button>
                         Render FOV: <input id="fov" type="number" value="${this.startFOV}"></input>
                         <button id="resetfov">Reset</button>
-                        <br/>Video Feed FOV: <input type="number" id="vfov" value="${this.startVideoFOV}"></input>
                         <button id="resetvfov">Reset</button>
                     </div>
                     <canvas></canvas>
@@ -286,6 +289,7 @@ export class SphericalVideoRenderer extends HTMLElement {
         this.setupEventListeners();
 
         this.animating = true;
+        this.lastUpdateTime = performance.now();
 
         this.animate();
 
@@ -384,6 +388,9 @@ export class SphericalVideoRenderer extends HTMLElement {
         
         this.camera.updateProjectionMatrix();
         this.renderer.clear();
+        this.shadowRoot.getElementById('xRate').value = 0;
+        this.shadowRoot.getElementById('yRate').value = 0;
+        this.shadowRoot.getElementById('zRate').value = 0;
 
     }
 
@@ -394,7 +401,9 @@ export class SphericalVideoRenderer extends HTMLElement {
         this.shadowRoot.getElementById('fov').value = this.startFOV;
         this.camera.updateProjectionMatrix();
         this.renderer.clear();
-
+        this.shadowRoot.getElementById('xRate').value = 0;
+        this.shadowRoot.getElementById('yRate').value = 0;
+        this.shadowRoot.getElementById('zRate').value = 0;
     }
 
     updateVideoFOV(value) {
@@ -409,6 +418,9 @@ export class SphericalVideoRenderer extends HTMLElement {
         this.resetFOV();
         this.createPartialSphere(this.startVideoFOV);
         this.renderer.clear();
+        this.shadowRoot.getElementById('xRate').value = 0;
+        this.shadowRoot.getElementById('yRate').value = 0;
+        this.shadowRoot.getElementById('zRate').value = 0;
 
     }
 
@@ -432,8 +444,6 @@ export class SphericalVideoRenderer extends HTMLElement {
         }
 
     }
-
-
 
     renderPartialSphereToTexture() {
 
@@ -464,16 +474,34 @@ export class SphericalVideoRenderer extends HTMLElement {
 
     }
 
-    onVideoFrame = () => {
+    onVideoFrame = (now, metadata) => {
 
         if(!this.animating) return;
         //this.updatePartialSphereRotation();
+
+        // Get the current time
+        const currentTime = performance.now();
+        // Calculate the elapsed time since the last frame in seconds
+        const elapsedTime = (currentTime - this.lastUpdateTime) / 1000;
+        // Update the last update time
+        this.lastUpdateTime = currentTime;
+        
+        // Get the rotation rates from the inputs
+        const xRate = parseFloat(this.shadowRoot.getElementById('xRate').value) || 0;
+        const yRate = parseFloat(this.shadowRoot.getElementById('yRate').value) || 0;
+        const zRate = parseFloat(this.shadowRoot.getElementById('zRate').value) || 0;
+
+        // Update the sphere's rotation based on the rate and elapsed time
+        this.partialSphere.rotation.x += xRate * elapsedTime;
+        this.partialSphere.rotation.y += yRate * elapsedTime;
+        this.partialSphere.rotation.z += zRate * elapsedTime;
+
         this.controls?.update(); //we need to update here so we aren't repainting frames in different positions
         if(this.partialSphere) this.updateCameraFOV();
         this.renderPartialSphereToTexture();
 
         if('requestVideoFrameCallback' in this.source) 
-            this.source.requestVideoFrameCallback(this.onVideoFrame.bind(this));
+            this.source.requestVideoFrameCallback(this.onVideoFrame);
 
     }
 
