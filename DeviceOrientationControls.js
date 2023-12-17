@@ -6,7 +6,7 @@ import * as THREE from 'three'
  * W3C Device Orientation control (http://w3c.github.io/deviceorientation/spec-source-orientation.html)
  */
 
-export const DeviceOrientationControls = function( object, offsetDeg, firstEvent ) {
+export const DeviceOrientationControls = function( object, offsetDeg, firstEvent, canvas ) {
 
 	var scope = this;
 
@@ -17,6 +17,7 @@ export const DeviceOrientationControls = function( object, offsetDeg, firstEvent
 
 	this.deviceOrientation = {};
 	this.screenOrientation = 0;
+	this.portraitMode = '';
 
 	this.alpha = 0;
 	this.alphaOffsetAngle = offsetDeg?.alpha || 0;
@@ -26,13 +27,12 @@ export const DeviceOrientationControls = function( object, offsetDeg, firstEvent
 	let firstCall = true;
 
 	var onDeviceOrientationChangeEvent = function( event ) {
-
 		scope.deviceOrientation = event;
-
 	};
 
 	var onScreenOrientationChangeEvent = (ev)=> {
-		scope.screenOrientation = ev.target.screen.orientation.angle;
+		scope.screenOrientation = ev.target.angle;
+		scope.portraitMode = ev.target.type;
 	}
 
 	// The angles alpha, beta and gamma form a set of intrinsic Tait-Bryan angles of type Z-X'-Y''
@@ -64,19 +64,26 @@ export const DeviceOrientationControls = function( object, offsetDeg, firstEvent
 	this.connect = function() {
 
 		//onScreenOrientationChangeEvent(); // run once on load
-
-		window.addEventListener( 'orientationchange', onScreenOrientationChangeEvent, false );
-		window.addEventListener( 'deviceorientation', onDeviceOrientationChangeEvent, false );
-
+		if(typeof WorkerGlobalScope !== 'undefined' && globalThis instanceof WorkerGlobalScope) { //workercanvas stuff 
+			canvas.addEventListener( 'orientation', onScreenOrientationChangeEvent, false );
+			canvas.addEventListener( 'deviceorientation', onDeviceOrientationChangeEvent, false );
+		} else {
+			screen.orientation.addEventListener('change', onScreenOrientationChangeEvent, false );
+			window.addEventListener( 'deviceorientation', onDeviceOrientationChangeEvent, false );
+		}
 		scope.enabled = true;
 
 	};
 
 	this.disconnect = function() {
+		if(typeof WorkerGlobalScope !== 'undefined' && globalThis instanceof WorkerGlobalScope) { //workercanvas stuff 
+			canvas.addEventListener( 'orientation', onScreenOrientationChangeEvent, false );
+			canvas.addEventListener( 'deviceorientation', onDeviceOrientationChangeEvent, false );
 
-		window.removeEventListener( 'orientationchange', onScreenOrientationChangeEvent, false );
-		window.removeEventListener( 'deviceorientation', onDeviceOrientationChangeEvent, false );
-
+		} else {
+			screen.orientation.removeEventListener('change', onScreenOrientationChangeEvent, false );
+			window.removeEventListener( 'deviceorientation', onDeviceOrientationChangeEvent, false );
+		}
 		scope.enabled = false;
 
 	};

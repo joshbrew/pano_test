@@ -23,7 +23,9 @@
   "author": "",
   "license": "",
   "dependencies": {
-    "three": "^0.159.0"
+    "threadop": "^1.5.4",
+    "three": "^0.159.0",
+    "workercanvas": "^1.0.15"
   },
   "nodemonConfig": {
     "env": {
