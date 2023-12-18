@@ -41,7 +41,7 @@ export class SphericalVideoRenderer extends HTMLElement {
     };
     played = false;
     animating = false; animationFrameId;
-    startPos; 
+    startPos = 'center'; autoAdjustFOV = false;
 
     constructor() {
         super();
@@ -60,6 +60,7 @@ export class SphericalVideoRenderer extends HTMLElement {
             resX:this.resX,
             resY:this.resY,
             maxFOV:this.maxFOV,
+            autoAdjustFOV:this.autoAdjustFOV,
             init:function(self,canvas,context){ 
 
                 const { THREE } = self;
@@ -116,7 +117,7 @@ export class SphericalVideoRenderer extends HTMLElement {
                         if(startPos && startPos !== 'center') {
                             let fov = self.camera.fov;
                             let vfov = self.sphereFOV;
-                            let diff = vfov - 0.25*fov;
+                            let diff = vfov - 0.75*fov;
                             if(startPos.value === 'left') {
                                 self.camera.rotateY(diff*Math.PI/180);
                             } else {
@@ -198,7 +199,7 @@ export class SphericalVideoRenderer extends HTMLElement {
             
                     if (self.partialSphere) {
                         self.partialSphere.rotation[axis] = value;
-                        self.updateCameraFOV();
+                        if(self.autoAdjustFOV) self.updateCameraFOV();
                     }
             
                 }
@@ -282,18 +283,9 @@ export class SphericalVideoRenderer extends HTMLElement {
                 self.updateCameraFOV = () => {
             
                      // Calculate the new FOV based on rotation, for example:
-                    const val = 2*180 * (Math.abs(self.partialSphere.rotation.x) + Math.abs(self.partialSphere.rotation.y))/Math.PI;
+                    let val = 2*180 * (Math.abs(self.partialSphere.rotation.x) + Math.abs(self.partialSphere.rotation.y))/Math.PI;
                     
-                    if(self.startPos !== 'center') {
-                        let fov = self.camera.fov;
-                        let vfov = self.sphereFOV;
-                        let diff = vfov - 0.25*fov;
-                        if(self.startPos === 'left') {
-                            val += diff
-                        } else if(self.startPos === 'right') {
-                            val -= diff;
-                        }
-                    }
+                    
                     const newFOV = Math.min(
                         self.maxFOV, val);
                   
@@ -324,7 +316,7 @@ export class SphericalVideoRenderer extends HTMLElement {
                     self.partialSphere.rotation.z += self.rotationRate.zRate * elapsedTime;
 
                     self.controls?.update(); //we need to update here so we aren't repainting frames in different positions
-                    if(self.partialSphere) self.updateCameraFOV();
+                    if(self.partialSphere && self.autoAdjustFOV) self.updateCameraFOV();
                     self.renderPartialSphereToTexture();
                 }
 
@@ -376,7 +368,7 @@ export class SphericalVideoRenderer extends HTMLElement {
                 self.renderer.render(self.scene,self.camera);
             },
             update:(self,canvas,context,input) => {
-                if(input) {
+                if(typeof input === 'object') {
                     if(input.image && self.renderTexture) {
                         self.sourceCtx.drawImage(input.image,0,0);
                         self.renderTexture.needsUpdate = true;
@@ -391,6 +383,7 @@ export class SphericalVideoRenderer extends HTMLElement {
                     if(input.videoFOV) self.updateVideoFOV(input.videoFOV);
                     if(input.fov) self.updateFOV(input.fov);
                     if(input.resetRender) self.resetRender(); //do this last
+                    else Object.assign(self,input);
                 }
                 
                 
@@ -586,7 +579,7 @@ export class SphericalVideoRenderer extends HTMLElement {
                             <option value="right">right</option>
                         </select>
                         <button id="clear">Reset Image</button><br/>
-                        Render FOV: <input id="fov" type="number" value="${this.startFOV}"></input>
+                        Render FOV: <input id="fov" type="number" value="${this.startFOV}"/> Auto: <input id="autofov" type="checkbox"/>
                         <button id="resetfov">Reset</button>
                     </div>
                     <canvas></canvas>
@@ -606,14 +599,17 @@ export class SphericalVideoRenderer extends HTMLElement {
                 this.resetRender();
             }
             this.shadowRoot.getElementById('startpos').onchange = () => {
-                this.resetRender();
                 this.startPos = this.shadowRoot.getElementById('startpos').value;
+                this.resetRender();
             }
             this.startPos = this.shadowRoot.getElementById('startpos').value;
             this.shadowRoot.getElementById('fov').onchange = (e) => this.onFovInpChange(e.target.value);
             this.shadowRoot.getElementById('resetfov').onclick = () => this.resetFOV();
             this.shadowRoot.getElementById('vfov').onchange = (e) => this.onVideoFovInpChange(e.target.value);
             this.shadowRoot.getElementById('resetvfov').onclick = () => this.resetVideoFOV();    
+            this.shadowRoot.getElementById('autofov').onchange = (ev) => {
+                this.autoAdjustFOV = ev.target.checked;
+            }
         }
        
         // Attach the canvas and video element to the renderer and texture
@@ -646,7 +642,7 @@ export class SphericalVideoRenderer extends HTMLElement {
             if(this.startPos !== 'center') {
                 let fov = this.camera.fov;
                 let vfov = this.sphereFOV;
-                let diff = vfov - 0.25*fov;
+                let diff = vfov - 0.75*fov;
                 if(this.startPos === 'left') {
                     this.camera.rotateY(diff*Math.PI/180);
                 } else {
@@ -786,7 +782,7 @@ export class SphericalVideoRenderer extends HTMLElement {
 
         if (this.partialSphere) {
             this.partialSphere.rotation[axis] = parseFloat(value);
-            this.updateCameraFOV();
+            if(this.autoAdjustFOV) this.updateCameraFOV();
         }
 
     }
@@ -868,11 +864,11 @@ export class SphericalVideoRenderer extends HTMLElement {
         if(this.startPos !== 'center') {
             let fov = this.camera.fov;
             let vfov = this.sphereFOV;
-            let diff = vfov - 0.25*fov;
+            let diff = vfov - 0.75*fov;
             if(this.startPos === 'left') {
-                val += diff
-            } else if(this.startPos === 'right') {
                 val -= diff;
+            } else if(this.startPos === 'right') {
+                val += diff;
             }
         }
         
@@ -915,7 +911,7 @@ export class SphericalVideoRenderer extends HTMLElement {
         this.partialSphere.rotation.z += zRate * elapsedTime;
 
         this.controls?.update(); //we need to update here so we aren't repainting frames in different positions
-        if(this.partialSphere) this.updateCameraFOV();
+        if(this.partialSphere && this.autoAdjustFOV) this.updateCameraFOV();
         this.renderPartialSphereToTexture();
 
         if('requestVideoFrameCallback' in this.source) 

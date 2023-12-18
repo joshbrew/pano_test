@@ -165,7 +165,7 @@ const setupPanos = (source,dx,dy,width,height,nSplits) => {
     masterPano.resX = imageLines[0].width;
     masterPano.resY = imageLines[0].height;
     masterPano.useWorkers = useWorkers;
-    masterPano.startFOV = 240*fov;
+    masterPano.startFOV = 30;
     masterPano.startVideoFOV = fov;
     div2.appendChild(masterPano);
     let secondaryPanos = [];
@@ -179,7 +179,7 @@ const setupPanos = (source,dx,dy,width,height,nSplits) => {
             PanoElm.resX = imageLines[i].width;
             PanoElm.resY = imageLines[i].height;
             PanoElm.useWorkers = useWorkers;
-            PanoElm.startFOV = 240*fov;
+            PanoElm.startFOV = 30;
             PanoElm.startVideoFOV = fov;
             secondaryPanos.push(PanoElm);
             div2.appendChild(PanoElm);
@@ -197,8 +197,8 @@ const setupPanos = (source,dx,dy,width,height,nSplits) => {
 
     panos.forEach((p) => {
         const c = p.shadowRoot.querySelector('canvas');
-        c.style.width = '32vw';
-        c.style.height = '10vw';
+        c.style.width = '100vw';
+        c.style.height = '30vw';
         cdiv.appendChild(c);
     });
 
@@ -278,6 +278,16 @@ const setupPanos = (source,dx,dy,width,height,nSplits) => {
                 
             }
         })
+    }
+
+    masterPano.shadowRoot.getElementById('autofov').onchange = (ev) => {
+        panos.forEach((pano) => {
+            if(useWorkers) {
+                pano.renderThread.update({autoAdjustFOV:ev.target.checked}); //need to transfer image to thread
+            } else {
+                pano.autoAdjustFOV = ev.target.checked;
+            }
+        });
     }
 
     let draw = (now) => {
