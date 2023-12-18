@@ -197,8 +197,8 @@ const setupPanos = (source,dx,dy,width,height,nSplits) => {
 
     panos.forEach((p) => {
         const c = p.shadowRoot.querySelector('canvas');
-        c.style.width = '32%';
-        c.style.height = '';
+        c.style.width = '32vw';
+        c.style.height = '10vw';
         cdiv.appendChild(c);
     });
 
@@ -273,8 +273,9 @@ const setupPanos = (source,dx,dy,width,height,nSplits) => {
         panos.forEach((pano,i) => {
             if(pano.useWorkers) pano.renderThread.update({startPos:ev.target.value, resetRender:true}); //update worker
             else {
-                pano.shadowRoot.getElementById('startpos').value = ev.target.value;
+                pano.startPos = ev.target.value;
                 pano.resetRender();
+                
             }
         })
     }

@@ -41,6 +41,7 @@ export class SphericalVideoRenderer extends HTMLElement {
     };
     played = false;
     animating = false; animationFrameId;
+    startPos; 
 
     constructor() {
         super();
@@ -595,7 +596,9 @@ export class SphericalVideoRenderer extends HTMLElement {
             }
             this.shadowRoot.getElementById('startpos').onchange = () => {
                 this.resetRender();
+                this.startPos = this.shadowRoot.getElementById('startpos').value;
             }
+            this.startPos = this.shadowRoot.getElementById('startpos').value;
             this.shadowRoot.getElementById('fov').onchange = (e) => this.onFovInpChange(e.target.value);
             this.shadowRoot.getElementById('resetfov').onclick = () => this.resetFOV();
             this.shadowRoot.getElementById('vfov').onchange = (e) => this.onVideoFovInpChange(e.target.value);
@@ -629,12 +632,11 @@ export class SphericalVideoRenderer extends HTMLElement {
     resetRender = () => {
         if(this.partialSphere) {
             this.lookAtSphere();
-            let startPos = this.shadowRoot.getElementById('startpos');
-            if(startPos.value !== 'center') {
+            if(this.startPos !== 'center') {
                 let fov = this.camera.fov;
                 let vfov = this.sphereFOV;
                 let diff = vfov - 0.25*fov;
-                if(startPos.value === 'left') {
+                if(this.startPos === 'left') {
                     this.camera.rotateY(diff*Math.PI/180);
                 } else {
                     this.camera.rotateY(-diff*Math.PI/180);
@@ -851,7 +853,18 @@ export class SphericalVideoRenderer extends HTMLElement {
     updateCameraFOV() {
 
          // Calculate the new FOV based on rotation, for example:
-        const val = 2*180 * (Math.abs(this.partialSphere.rotation.x) + Math.abs(this.partialSphere.rotation.y))/Math.PI;
+        let val = 2*180 * (Math.abs(this.partialSphere.rotation.x) + Math.abs(this.partialSphere.rotation.y))/Math.PI;
+        if(this.startPos !== 'center') {
+            let fov = this.camera.fov;
+            let vfov = this.sphereFOV;
+            let diff = vfov - 0.25*fov;
+            if(this.startPos === 'left') {
+                val += diff
+            } else if(this.startPos === 'right') {
+                val -= diff;
+            }
+        }
+        
         const newFOV = Math.min(
             this.maxFOV, val);
       
