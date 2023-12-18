@@ -308,6 +308,10 @@ const setupPanos = (source,dx,dy,width,height,nSplits) => {
 
     setTimeout(()=>{
         source.requestVideoFrameCallback(draw);
+        if(useWorkers) {
+            masterPano.shadowRoot.getElementById('clear').click();
+            masterPano.shadowRoot.getElementById('resetvfov').click();
+        }
     },100); 
 
 }

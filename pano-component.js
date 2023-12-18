@@ -284,8 +284,7 @@ export class SphericalVideoRenderer extends HTMLElement {
             
                      // Calculate the new FOV based on rotation, for example:
                     let val = 2*180 * (Math.abs(self.partialSphere.rotation.x) + Math.abs(self.partialSphere.rotation.y))/Math.PI;
-                    
-                    
+                   
                     const newFOV = Math.min(
                         self.maxFOV, val);
                   
@@ -378,12 +377,14 @@ export class SphericalVideoRenderer extends HTMLElement {
                         Object.keys(input.rotation).forEach((k)=> self.updateRotation(k,input.rotation[k]));
                     if(input.rotationRate) Object.assign(self.rotationRate,input.rotationRate);
                     if(input.startPos) self.startPos = input.startPos;
-                    if(input.resetVideoFOV)self.resetVideoFOV();
-                    if(input.resetFOV) self.resetFOV();
+                    if(input.resetVideoFOV) self.resetVideoFOV();
+                    if(input.resetFOV) {
+                        self.resetFOV();
+                    }
                     if(input.videoFOV) self.updateVideoFOV(input.videoFOV);
                     if(input.fov) self.updateFOV(input.fov);
                     if(input.resetRender) self.resetRender(); //do this last
-                    else Object.assign(self,input);
+                    if(input.autoAdjustFOV) self.autoAdjustFOV = input.autoAdjustFOV;
                 }
                 
                 
@@ -861,16 +862,6 @@ export class SphericalVideoRenderer extends HTMLElement {
 
          // Calculate the new FOV based on rotation, for example:
         let val = 2*180 * (Math.abs(this.partialSphere.rotation.x) + Math.abs(this.partialSphere.rotation.y))/Math.PI;
-        if(this.startPos !== 'center') {
-            let fov = this.camera.fov;
-            let vfov = this.sphereFOV;
-            let diff = vfov - 0.75*fov;
-            if(this.startPos === 'left') {
-                val -= diff;
-            } else if(this.startPos === 'right') {
-                val += diff;
-            }
-        }
         
         const newFOV = Math.min(
             this.maxFOV, val);
