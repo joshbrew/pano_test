@@ -283,6 +283,17 @@ export class SphericalVideoRenderer extends HTMLElement {
             
                      // Calculate the new FOV based on rotation, for example:
                     const val = 2*180 * (Math.abs(self.partialSphere.rotation.x) + Math.abs(self.partialSphere.rotation.y))/Math.PI;
+                    
+                    if(self.startPos !== 'center') {
+                        let fov = self.camera.fov;
+                        let vfov = self.sphereFOV;
+                        let diff = vfov - 0.25*fov;
+                        if(self.startPos === 'left') {
+                            val += diff
+                        } else if(self.startPos === 'right') {
+                            val -= diff;
+                        }
+                    }
                     const newFOV = Math.min(
                         self.maxFOV, val);
                   
