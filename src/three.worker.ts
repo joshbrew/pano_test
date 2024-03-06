@@ -3,6 +3,7 @@ import { workerCanvasRoutes, CanvasProps } from 'workercanvas';
 
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
+import { DeviceOrientationControls } from './DeviceOrientationControls';
 //import { PickHelper } from './PickHelper'
 //etc...
 // import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js'
@@ -20,6 +21,7 @@ if(typeof WorkerGlobalScope !== 'undefined') {
         receiveThreeCanvas:function(options:CanvasProps){ //modified canvas receiver that installs desired threejs modules
                 const ThreeProps = { //e.g. install these systems to 'self', which is the worker canvas
                     THREE,
+                    DeviceOrientationControls,
                     OrbitControls,
                     // EffectComposer,
                     // RenderPass,
@@ -46,7 +48,6 @@ if(typeof WorkerGlobalScope !== 'undefined') {
                 routes[ev.data.route](...ev.data.args);
             } else routes[ev.data.route](ev.data.args);
         } //that's it! The functions handle worker communication internally
-    
     }
     
 }

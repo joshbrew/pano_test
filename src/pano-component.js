@@ -2,7 +2,9 @@ import * as THREE from 'three';
 import {DeviceOrientationControls} from './DeviceOrientationControls';
 //import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { Renderer } from 'workercanvas'
+
 import worker from './three.worker'
+worker;
 // import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 // import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 // import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
@@ -52,7 +54,7 @@ export class SphericalVideoRenderer extends HTMLElement {
 
         //this should automatically transmit orientation information so we should be set
         this.renderThread = Renderer({
-            worker,
+            worker:new Worker("./dist/three.worker.js", {type:'module'}),
             canvas:this.canvas,
             route:'receiveThreeCanvas',
             startFOV:this.startFOV,
@@ -61,9 +63,10 @@ export class SphericalVideoRenderer extends HTMLElement {
             resY:this.resY,
             maxFOV:this.maxFOV,
             autoAdjustFOV:this.autoAdjustFOV,
+            useOrientation:this.useOrientation,
             init:function(self,canvas,context){ 
 
-                const { THREE } = self;
+                const { THREE, DeviceOrientationControls } = self;
                 //could also use 'this' but self is a cleaner association with the render thread
                 self.rotationRate = {
                     xRate:0, rotX:0, initialX:0,
@@ -101,9 +104,16 @@ export class SphericalVideoRenderer extends HTMLElement {
                     self.scene.add(self.partialSphere);
             
                     if (self.useOrientation) { //probably safest option for mobile
-                        self.controls = new DeviceOrientationControls(self.partialSphere, undefined, () => {
-                            self.lookAtSphere();
-                        }, self.canvas);
+                        self.controls = new DeviceOrientationControls(
+                            self.partialSphere, 
+                            undefined, 
+                            () => {
+                                self.lookAtSphere();
+                            }, 
+                            (obj,o,ang,pmode) => {
+                            },
+                            self.canvas
+                        );
                         self.controls.update();
                        
                     } 
@@ -113,23 +123,16 @@ export class SphericalVideoRenderer extends HTMLElement {
                 self.resetRender = () => {
                     if(self.partialSphere) {
                         self.lookAtSphere();
-                        let startPos = self.startPos;
-                        if(startPos && startPos !== 'center') {
-                            let fov = self.camera.fov;
-                            let vfov = self.sphereFOV;
-                            let diff = vfov - 0.75*fov;
-                            if(startPos.value === 'left') {
-                                self.camera.rotateY(diff*Math.PI/180);
-                            } else {
-                                self.camera.rotateY(-diff*Math.PI/180);
-                            }
-                        }
                     }
                     self.renderer.clear(); 
                 }
             
 
-                self.lookAtSphere = () => {
+                self.lookAtSphere = (
+                    constrainX=false, 
+                    constrainY=false, 
+                    constrainZ=false
+                ) => {
                     // Assuming the point we are tracking on the sphere's surface is initially at (0, 0, 1) before rotation
                     let initialDirection = new THREE.Vector3(0, 0, 1);
                     let sphereCenter = self.partialSphere.position; // Center of the sphere
@@ -137,15 +140,41 @@ export class SphericalVideoRenderer extends HTMLElement {
             
                     // Now set the camera position to the center of the sphere
                     self.camera.position.copy(sphereCenter);
+
+                    if(constrainX) direction.x = 0;
+                    if(constrainY) direction.y = 0;
+                    if(constrainZ) direction.z = 0;
             
                     // Calculate a point in space in the direction we want the camera to look
                     let lookAtPoint = new THREE.Vector3().addVectors(sphereCenter, direction);
             
                     // Make the camera look in the direction of the sphere's rotation
                     self.camera.lookAt(lookAtPoint);
-                    self.camera.rotation.z = 0;
-                    if(/(android)/i.test(navigator.userAgent)) {
-                        self.camera.rotation.z -= Math.PI/2;
+
+                    self.camera.quaternion.copy(self.partialSphere.quaternion);
+
+                    // Create a quaternion representing a 180 degree rotation around the Y axis
+                    let y180Rotation = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI);
+
+                    // Apply this rotation to the camera's current quaternion
+                    self.camera.quaternion.multiply(y180Rotation);
+                    self.camera.rotateZ(Math.PI);
+
+                    let cameraEuler = new THREE.Euler().setFromQuaternion(
+                        self.camera.quaternion, 'XYZ'
+                    );
+                    self.partialSphere.rotation.z = cameraEuler.z;
+
+                    let startPos = self.startPos;
+                    if(startPos && startPos !== 'center') {
+                        let fov = self.camera.fov;
+                        let vfov = self.sphereFOV;
+                        let diff = vfov - 0.75*fov;
+                        if(startPos === 'left') {
+                            self.camera.rotateY(diff*Math.PI/180);
+                        } else {
+                            self.camera.rotateY(-diff*Math.PI/180);
+                        }
                     }
                 }
 
@@ -385,6 +414,7 @@ export class SphericalVideoRenderer extends HTMLElement {
                     if(input.fov) self.updateFOV(input.fov);
                     if(input.resetRender) self.resetRender(); //do this last
                     if(input.autoAdjustFOV) self.autoAdjustFOV = input.autoAdjustFOV;
+                    if(input.calibrate && self.controls) self.controls.calibrate();
                 }
                 
                 
@@ -513,11 +543,24 @@ export class SphericalVideoRenderer extends HTMLElement {
         this.scene.add(this.partialSphere);
 
         if (this.useOrientation) { //probably safest option for mobile
-            this.controls = new DeviceOrientationControls(this.partialSphere, undefined, () => {
-                this.lookAtSphere();
-            });
+            this.controls = new DeviceOrientationControls(
+                this.partialSphere, 
+                undefined, 
+                () => { //TODO: MAKE SURE THIS ALWAYS FIXES THE IMAGE VERTICALLY WHEN STARTING/RESETTING TRACKING
+                    this.lookAtSphere();
+                    this.renderer.clear();
+                },
+                (obj,o,ang,pmode) => {
+                    // //fix roll
+                    // let cameraEuler = new THREE.Euler().setFromQuaternion(
+                    //     this.camera.quaternion, 'XYZ'
+                    // );
+                    // this.partialSphere.rotation.z = cameraEuler.z;
+                    // // if(pmode.includes('landscape')) 
+                    // //     this.partialSphere.rotateZ(Math.PI/2);
+                }
+            );
             this.controls.update();
-           
         } 
 
     }
@@ -546,6 +589,7 @@ export class SphericalVideoRenderer extends HTMLElement {
                         left: 10px;
                         z-index: 100;
                         font-size: 2vw;
+                        background-color:rgba(10,10,10,0.5);
                     }
                     .slider {
                         width: 200px;
@@ -568,31 +612,60 @@ export class SphericalVideoRenderer extends HTMLElement {
                         max-height:100%;
                     }
                 </style>
-                <div class="container">
-                    <div id="controls" class="slider-container">
-                        Camera FOV (set to match your lens!): <input type="number" id="vfov" value="${this.startVideoFOV}"></input><button id="resetvfov">Reset</button><br/>
-                        <div>Horizontal: <input type="range" id="ySlider" class="slider" min="-${Math.PI}" max="${Math.PI}" step="${this.startFOV*0.00005}" value="0"> Rate (rad/s):<input value="0" id="yRate" min="-${Math.PI}" max="${Math.PI}" type="number" step="${this.startFOV*0.0001}" /></div>
-                        <div>Vertical: <input type="range" id="xSlider" class="slider" min="-${Math.PI}" max="${Math.PI}" step="${this.startFOV*0.00005}" value="0"> Rate (rad/s):<input value="0" id="xRate" min="-${Math.PI}" max="${Math.PI}" type="number" step="${this.startFOV*0.0001}" /></div>
-                        <div>Tilt: <input type="range" id="zSlider" class="slider" min="-${Math.PI}" max="${Math.PI}" step="${this.startFOV*0.00005}" value="0"> Rate (rad/s):<input value="0" id="zRate" min="-${Math.PI}" max="${Math.PI}" type="number" step="${this.startFOV*0.0001}" /></div>
+                <div id="container" class="container">
+                    <div id="controlscontainer">
                         Starting Position: <select id="startpos">
                             <option value="center" selected>centered</option>
                             <option value="left">left</option>
                             <option value="right">right</option>
                         </select>
-                        <button id="clear">Reset Image</button><br/>
-                        Render FOV: <input id="fov" type="number" value="${this.startFOV}"/> Auto: <input id="autofov" type="checkbox"/>
-                        <button id="resetfov">Reset</button>
+                        <button id="toggleControls">More Controls</button>
+                        <button id="save">Save</button>
+                        <button id="resetvfov">Reset Image</button><br/>
+                        <div style="position:relative;">
+                            <div id="controls" class="slider-container" style="display:none;">
+                                Camera FOV (set to match your lens!): <input type="number" id="vfov" value="${this.startVideoFOV}">
+                                <div>Horizontal: <input type="range" id="ySlider" class="slider" min="-${Math.PI}" max="${Math.PI}" step="${this.startFOV*0.00005}" value="0"> Rate (rad/s):<input value="0" id="yRate" min="-${Math.PI}" max="${Math.PI}" type="number" step="${this.startFOV*0.0001}" /></div>
+                                <div>Vertical: <input type="range" id="xSlider" class="slider" min="-${Math.PI}" max="${Math.PI}" step="${this.startFOV*0.00005}" value="0"> Rate (rad/s):<input value="0" id="xRate" min="-${Math.PI}" max="${Math.PI}" type="number" step="${this.startFOV*0.0001}" /></div>
+                                <div>Tilt: <input type="range" id="zSlider" class="slider" min="-${Math.PI}" max="${Math.PI}" step="${this.startFOV*0.00005}" value="0"> Rate (rad/s):<input value="0" id="zRate" min="-${Math.PI}" max="${Math.PI}" type="number" step="${this.startFOV*0.0001}" /></div>      
+                                <button id="clear">Clear Image</button><br/>
+                                Render FOV: <input id="fov" type="number" value="${this.startFOV}"/> Auto: <input id="autofov" type="checkbox"/>
+                                <button id="resetfov">Reset</button>
+                            </div>
+                        </div>
                     </div>
                     <canvas></canvas>
                     ${!this.source ? '<video></video>' : ''}
                 </div>
             </span>
         `;
+
+        // Attach the canvas and video element to the renderer and texture
+        this.canvas = this.shadowRoot.querySelector('canvas');
+        if(!this.source) this.source = this.shadowRoot.querySelector('video');
         
         // Slider events
         if(this.hideControls) {
-            this.shadowRoot.getElementById('controls').style.display = 'none';
+            this.shadowRoot.getElementById('controlscontainer').style.display = 'none';
         } else {
+
+            this.shadowRoot.getElementById('save').onclick = () => {
+                this.canvas.toBlob((blob)=>{
+                    let link = document.createElement('a');
+                    link.download =  'scan.png';
+                    link.href = URL.createObjectURL(blob);
+                    link.click();
+                    URL.revokeObjectURL(link.href); // Clean up the URL object
+                });
+            }
+
+            // Toggle button event
+            this.shadowRoot.getElementById('toggleControls').onclick = () => {
+                const controls = this.shadowRoot.getElementById('controls');
+                controls.style.display = controls.style.display === 'none' ? '' : 'none';
+                this.shadowRoot.getElementById('toggleControls').textContent = controls.style.display === 'none' ? 'More Controls' : 'Hide Controls';
+            };
+
             this.shadowRoot.getElementById('xSlider').oninput = (e) => this.onXSliderChange(e.target.value);
             this.shadowRoot.getElementById('ySlider').oninput = (e) => this.onYSliderChange(e.target.value);
             this.shadowRoot.getElementById('zSlider').oninput = (e) => this.onZSliderChange(e.target.value);
@@ -613,9 +686,6 @@ export class SphericalVideoRenderer extends HTMLElement {
             }
         }
        
-        // Attach the canvas and video element to the renderer and texture
-        this.canvas = this.shadowRoot.querySelector('canvas');
-        if(!this.source) this.source = this.shadowRoot.querySelector('video');
 
 
     }
@@ -640,40 +710,62 @@ export class SphericalVideoRenderer extends HTMLElement {
     resetRender = () => {
         if(this.partialSphere) {
             this.lookAtSphere();
-            if(this.startPos !== 'center') {
-                let fov = this.camera.fov;
-                let vfov = this.sphereFOV;
-                let diff = vfov - 0.75*fov;
-                if(this.startPos === 'left') {
-                    this.camera.rotateY(diff*Math.PI/180);
-                } else {
-                    this.camera.rotateY(-diff*Math.PI/180);
-                }
-            }
         }
-        this.shadowRoot.getElementById('xSlider').value = 0;
-        this.shadowRoot.getElementById('ySlider').value = 0;
-        this.shadowRoot.getElementById('zSlider').value = 0;
+        if(!this.hideControls) {
+            this.shadowRoot.getElementById('xSlider').value = 0;
+            this.shadowRoot.getElementById('ySlider').value = 0;
+            this.shadowRoot.getElementById('zSlider').value = 0;
+        }
         this.renderer.clear(); 
     }
 
-    lookAtSphere = () => {
+    lookAtSphere = (
+        constrainX=false, 
+        constrainY=false, 
+        constrainZ=false
+    ) => {
         // Assuming the point we are tracking on the sphere's surface is initially at (0, 0, 1) before rotation
-        var initialDirection = new THREE.Vector3(0, 0, 1);
-        var sphereCenter = this.partialSphere.position; // Center of the sphere
-        var direction = initialDirection.clone().applyQuaternion(this.partialSphere.quaternion).normalize();
+        let initialDirection = new THREE.Vector3(0, 0, 1);
+        let sphereCenter = this.partialSphere.position; // Center of the sphere
+        let direction = initialDirection.clone().applyQuaternion(this.partialSphere.quaternion).normalize();
 
         // Now set the camera position to the center of the sphere
         this.camera.position.copy(sphereCenter);
 
+        if(constrainX) direction.x = 0;
+        if(constrainY) direction.y = 0;
+        if(constrainZ) direction.z = 0;
+
         // Calculate a point in space in the direction we want the camera to look
-        var lookAtPoint = new THREE.Vector3().addVectors(sphereCenter, direction);
+        let lookAtPoint = new THREE.Vector3().addVectors(sphereCenter, direction);
 
         // Make the camera look in the direction of the sphere's rotation
         this.camera.lookAt(lookAtPoint);
-        this.camera.rotation.z = 0;
-        if(/(android)/i.test(navigator.userAgent)) {
-            this.camera.rotation.z -= Math.PI/2;
+
+        this.camera.quaternion.copy(this.partialSphere.quaternion);
+
+        // Create a quaternion representing a 180 degree rotation around the Y axis
+        let y180Rotation = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI);
+
+        // Apply this rotation to the camera's current quaternion
+        this.camera.quaternion.multiply(y180Rotation);
+        this.camera.rotateZ(Math.PI);
+
+        let cameraEuler = new THREE.Euler().setFromQuaternion(
+            this.camera.quaternion, 'XYZ'
+        );
+        this.partialSphere.rotation.z = cameraEuler.z;
+
+        let startPos = this.startPos;
+        if(startPos && startPos !== 'center') {
+            let fov = this.camera.fov;
+            let vfov = this.sphereFOV;
+            let diff = vfov - 0.75*fov;
+            if(startPos === 'left') {
+                this.camera.rotateY(diff*Math.PI/180);
+            } else {
+                this.camera.rotateY(-diff*Math.PI/180);
+            }
         }
     }
 
@@ -736,6 +828,7 @@ export class SphericalVideoRenderer extends HTMLElement {
 
     disconnectedCallback() {
         this.animating = false;
+        if(this.renderThread) this.renderThread.worker.terminate();
         this.destroy();
     }
 
@@ -803,6 +896,7 @@ export class SphericalVideoRenderer extends HTMLElement {
     }
 
     resetFOV() {
+
 
         this.camera.fov = this.startFOV;
         this.camera.position.z = 0;

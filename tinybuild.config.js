@@ -1,7 +1,7 @@
 const config = {
     bundler: { //esbuild settings, set false to skip build step or add bundle:true to config object to only bundle (alt methods)
         entryPoints: [ //entry point file(s). These can include .js, .mjs, .ts, .jsx, .tsx, or other javascript files. Make sure your entry point is a ts file if you want to generate types
-        "index.js"
+            "index.js"
         ],
         outfile: "dist/index", //exit point file, will append .js as well as indicators like .esm.js, .node.js for other build flags
         //outdir:'dist'         //exit point folder, define for multiple entryPoints
@@ -14,6 +14,8 @@ const config = {
         //bundleCommonJS:false, //cjs format outputted as .cjs
         minify: true,
         sourcemap: false,
+        workerBundler:{minify:true, format:'esm'} //bundler settings specific to the worker. e.g. apply platform:'node' when bundling node workers, 
+        
         //plugins:[] //custom esbuild plugins? e.g. esbuild-sass-plugin for scss support
         //includeDefaultPlugins:true //true by default, includes the presets for the streaming imports, worker bundling, and auto npm install
         //blobWorkers:true, //package workers as blobs or files? blobs are faster but inflate the main package size

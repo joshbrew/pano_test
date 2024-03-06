@@ -1,11 +1,11 @@
-# pano_test
- ThreeJS panoramas example with orientation or gyro. Paint a half sphere with the image!
+This is unfinished but it has all the code we need
 
-Demo (android only pretty sure): https://threepanorama.netlify.app/
 
-Make sure you adjust the Video Feed FOV to match your camera's FOV. E.g. my S10e's regular camera is 77 deg, the front facing is ~35 deg (not sure), and the wide field is 123. 
 
-Otherwise still some bugs with CSS and orientation detection on mobile but it kinda works!
+TODOS:
 
-![1](./test1.jpg)
-![2](./test2.jpg)
+Sort out the camera lens/zoom/perspective handling better, it's very manual right now but it's hard to avoid at the moment. In general we need to automate the camera perspective stuff as much as possible 
+
+(e.g. tracking the spectrum width so we can auto-zoom and set an x-axis using some kind of calibration step e.g. color filter paper for 1 or 2 specific wavelengths to track the x-axis onto.)
+
+Fixing quaternion perspective stuff so we have the correct relative starting point (vertical lines)

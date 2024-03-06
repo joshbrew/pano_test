@@ -31,15 +31,16 @@ export class BoundingBoxTool {
     ctx:CanvasRenderingContext2D;
     options:BBOptions;
     boxes:Box[]
-    isDrawing:boolean;
     startX:number;
     startY:number;
 
     currentBox:any;
     currentBoxIndex:number;
+    isFirstClick:boolean=true;
+    mouseDown:boolean=false;
     isResizing:boolean=false;
+    isDrawing:boolean=false;
     resizingEdge:any;
-    justFocused:boolean = false;
     resizeObserver?:ResizeObserver;
     originalWidth: number;
     originalHeight: number;
@@ -192,50 +193,67 @@ export class BoundingBoxTool {
         return -1; // No box edge found near the mouse position
     }
     
+    // Method to draw a circle
+    drawCircle(x, y) {
+        const radius = 7; // You can adjust the size of the circle
+        this.ctx.beginPath();
+        this.ctx.arc(x, y, radius, 0, 2 * Math.PI, false);
+        this.ctx.fillStyle = 'red'; // Choose the color of the circle
+        this.ctx.fill();
+        this.ctx.lineWidth = 2;
+        this.ctx.strokeStyle = '#003300';
+        this.ctx.stroke();
+    }
+
     handleMouseDown(event) {
-        if (this.justFocused) {
-            this.justFocused = false; // Reset the flag
-            return; // Exit the function to avoid drawing a new box
-        }
-    
-        const canvasRect = this.overlayCanvas.getBoundingClientRect();
-        this.startX = event.clientX - canvasRect.left;
-        this.startY = event.clientY - canvasRect.top;
-    
+
+        this.mouseDown = true;
         const clickedBoxIndex = this.findBoxEdge(event);
         if (clickedBoxIndex !== -1) {
             this.isDrawing = false;
             this.isResizing = true;
             this.currentBoxIndex = clickedBoxIndex;
             this.currentBox = this.boxes[clickedBoxIndex];
-        } else {
+        } else if (!this.isDrawing && this.isFirstClick) {
+            const canvasRect = this.overlayCanvas.getBoundingClientRect();
+            this.startX = event.clientX - canvasRect.left;
+            this.startY = event.clientY - canvasRect.top;
+            // Draw a circle at the start position
+            this.drawCircle(this.startX, this.startY);
             this.isDrawing = true;
         }
+
     }
       
     handleMouseMove(event) {
-        const canvasRect = this.overlayCanvas.getBoundingClientRect();
-        const mouseX = event.clientX - canvasRect.left;
-        const mouseY = event.clientY - canvasRect.top;
-
-        if (this.isResizing) {
-            this.resizeBox({ offsetX: mouseX, offsetY: mouseY }, this.currentBox.rect, this.resizingEdge);
-            this.redrawCanvas();
-        } else if (this.isDrawing) {
-            this.redrawCanvas();
-            this.drawBoundingBox(this.startX, this.startY, mouseX - this.startX, mouseY - this.startY);
+        if(this.mouseDown) {
+            const canvasRect = this.overlayCanvas.getBoundingClientRect();
+            const mouseX = event.clientX - canvasRect.left;
+            const mouseY = event.clientY - canvasRect.top;
+    
+            if (this.isResizing) {
+                this.resizeBox({ offsetX: mouseX, offsetY: mouseY }, this.currentBox.rect, this.resizingEdge);
+                this.redrawCanvas();
+            } else if (this.isDrawing) {
+                this.redrawCanvas();
+                this.drawBoundingBox(this.startX, this.startY, mouseX - this.startX, mouseY - this.startY);
+                this.isFirstClick = false;
+            }
         }
     }
-      
+    
     handleMouseUp(event) {
+
+        this.mouseDown = false;
         if (this.isResizing) {
             this.isResizing = false;
             if (this.options.onedited) {
                 this.options.onedited(this.currentBox, this.boxes, this.boxes.findIndex((v)=>{if(this.currentBox.id === v.id) return true;}), this.sourceElement, this.overlayCanvas, this.ctx);
             }
-        } else if (this.isDrawing) {
+        } else if (this.isDrawing && !this.isFirstClick) {
             this.isDrawing = false;
-    
+            this.isFirstClick = true;
+
             const canvasRect = this.overlayCanvas.getBoundingClientRect();
             const endX = event.clientX - canvasRect.left;
             const endY = event.clientY - canvasRect.top;
@@ -260,9 +278,12 @@ export class BoundingBoxTool {
                     this.options.oncreate(newBox, this.boxes, this.sourceElement, this.overlayCanvas, this.ctx);
                 }
             }
+        } else {
+            this.isFirstClick = false;
         }
+        
     }
-    
+      
     getScale = () => {
         const sourceWidth = (this.sourceElement as HTMLImageElement).naturalWidth || (this.sourceElement as HTMLVideoElement).videoWidth || this.sourceElement.width;
         const sourceHeight = (this.sourceElement as HTMLImageElement).naturalHeight || (this.sourceElement as HTMLVideoElement).videoHeight || this.sourceElement.height;
@@ -455,7 +476,7 @@ export class BoundingBoxTool {
             labelContainer.style.position = 'absolute';
 
             labelContainer.style.color = this.options.labelColor || 'black';
-            labelContainer.style.zIndex = `${parseInt(this.sourceElement.style.zIndex + 1)}`;
+            labelContainer.style.zIndex = '1000';
             labelContainer.style.display = 'flex';
             labelContainer.style.alignItems = 'center';
 
@@ -502,23 +523,21 @@ export class BoundingBoxTool {
             // Handle when user finishes editing
             labelInput.onblur = () => {
                 window.removeEventListener('keydown',keydownlistener)
-                this.justFocused = false;
+               
                 const prevLabel = box.label;
                 box.label = labelInput.value;
                 labelSpan.textContent = box.label || 'Edit';
                 labelSpan.style.textShadow = '1px 2px red, 0 0 1em blue, 0 0 0.2em blue';
                 
                 labelContainer.replaceChild(labelSpan, labelInput);
-                this.redrawCanvas();
+                //this.redrawCanvas();
                 if (prevLabel !== box.label && this.options.onedited) {
                     this.options.onedited(box, this.boxes, this.boxes.findIndex((v)=>{if(box.id === v.id) return true;}), this.sourceElement, this.overlayCanvas, this.ctx);
                 }
             };
 
-            labelInput.onfocus = () => {
-                // When label input is focused, reset the justFocused flag
-                this.justFocused = true;
-            };
+            // labelInput.onfocus = () => {
+            // };
             
             labelContainer.replaceChild(labelInput, labelSpan);
             labelInput.focus();
@@ -577,6 +596,8 @@ export class BoundingBoxTool {
         const labelContainer = document.getElementById(`label_container_${id}`);
         if (labelContainer) document.body.removeChild(labelContainer);
         this.redrawCanvas();
+        this.isFirstClick = true;
+        this.isDrawing = false;
         if(this.options.ondelete) this.options.ondelete(spliced[0], this.boxes, index, this.sourceElement, this.overlayCanvas, this.ctx);
       }
     }
